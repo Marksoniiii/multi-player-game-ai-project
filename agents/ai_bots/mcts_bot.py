@@ -10,7 +10,15 @@ from typing import Dict, List, Tuple, Any, Optional
 from agents.base_agent import BaseAgent
 import config
 import copy
+from agents.ai_bots.minimax_bot import MinimaxBot
 
+class MCTSBot(BaseAgent):
+    def __init__(self, name: str = "MCTSBot", player_id: int = 1, simulation_count: int = 300):
+        super().__init__(name, player_id)
+        ai_config = config.AI_CONFIGS.get('mcts', {})
+        self.simulation_count = ai_config.get('simulation_count', simulation_count)
+        self.timeout = ai_config.get('timeout', 10)
+        self.evaluator = MinimaxBot(name="Eval", player_id=self.player_id)
 
 class MCTSNode:
     """MCTS节点"""
@@ -62,6 +70,7 @@ class MCTSBot(BaseAgent):
         ai_config = config.AI_CONFIGS.get('mcts', {})
         self.simulation_count = ai_config.get('simulation_count', simulation_count)
         self.timeout = ai_config.get('timeout', 10)
+        self.evaluator = MinimaxBot(name="Eval", player_id=self.player_id)
     
     def get_action(self, observation: Any, env: Any) -> Any:
         """
@@ -111,44 +120,37 @@ class MCTSBot(BaseAgent):
         return max(node.children, key=ucb)
 
     def _simulate(self, state):
-        # 启发式模拟到终局：优先连子和阻断对方连子
-        player = self.player_id
-        opponent = 3 - player
+        # 启发式模拟到终局：优先选择评估分数最高的点
+        player = state.current_player
+
         while not state.is_terminal():
             valid_actions = state.get_valid_actions()
             if not valid_actions:
                 break
-            # 优先级1：直接获胜
+
+            best_action = None
+            best_score = -float('inf')
+
+            # 从所有可选布子点中，选一个对自己最有利的
             for action in valid_actions:
-                temp = state.clone()
-                temp.step(action)
-                if temp.get_winner() == player:
-                    state.step(action)
-                    break
+                temp_state = state.clone()
+                temp_state.step(action)
+                # 使用Minimax的评估函数来打分
+                score = self.evaluator.evaluate(temp_state)
+                # 因为minimax的评估函数是基于自己减去对手，所以需要根据当前模拟的玩家调整
+                if player != self.player_id:
+                    score = -score
+
+                if score > best_score:
+                    best_score = score
+                    best_action = action
+
+            if best_action:
+                state.step(best_action)
             else:
-                # 优先级2：阻断对方直接获胜
-                for action in valid_actions:
-                    temp = state.clone()
-                    temp.step(action)
-                    if temp.get_winner() == opponent:
-                        state.step(action)
-                        break
-                else:
-                    # 优先级3：优先连四、活三
-                    best_score = -float('inf')
-                    best_action = None
-                    for action in valid_actions:
-                        temp = state.clone()
-                        temp.step(action)
-                        score = self._simple_heuristic(temp, player, opponent)
-                        if score > best_score:
-                            best_score = score
-                            best_action = action
-                    if best_action is not None:
-                        state.step(best_action)
-                    else:
-                        action = random.choice(valid_actions)
-                        state.step(action)
+                # 如果没有可选动作，则随机走
+                state.step(random.choice(valid_actions))
+
         winner = state.get_winner()
         if winner == self.player_id:
             return 1
@@ -156,7 +158,6 @@ class MCTSBot(BaseAgent):
             return -1
         else:
             return 0
-
     def _simple_heuristic(self, state, player, opponent):
         # 简单启发式：连四>连三>连二，惩罚对方连四
         board = state.board if hasattr(state, 'board') else state.get_state()['board']
