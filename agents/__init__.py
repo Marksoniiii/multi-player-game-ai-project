@@ -1,5 +1,6 @@
 """
 智能体模块
+统一导出所有常用AI和人类智能体，便于主程序import。
 """
 
 from .base_agent import BaseAgent
@@ -21,4 +22,4 @@ __all__ = [
     'BehaviorTreeBot',
     'SnakeAI',
     'SmartSnakeAI'
-] 
+]

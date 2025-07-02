@@ -482,14 +482,13 @@ class MultiGameGUI:
                            (self.margin + board_size * self.cell_size, y), 1)
         
         # 绘制游戏元素
-        board = self.env.game.board
+        board = self.env.game.get_state()['board']  # 修复：SnakeGame无board属性
         for row in range(board_size):
             for col in range(board_size):
                 if board[row, col] != 0:
                     x = self.margin + col * self.cell_size + 2
                     y = self.margin + row * self.cell_size + 2
                     rect = pygame.Rect(x, y, self.cell_size - 4, self.cell_size - 4)
-                    
                     if board[row, col] == 1:  # 蛇1头部
                         pygame.draw.rect(self.screen, COLORS['BLUE'], rect)
                     elif board[row, col] == 2:  # 蛇1身体
@@ -632,4 +631,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()

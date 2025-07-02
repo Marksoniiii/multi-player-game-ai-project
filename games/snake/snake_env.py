@@ -22,9 +22,9 @@ class SnakeEnv(BaseEnv):
         self.observation_space = None
         self.action_space = None
 
-    def _get_observation(self):
-        """获取观察"""
-        return self.game.board.copy()
+    def _get_observation(self) -> np.ndarray:
+        # 修复：SnakeGame没有self.board属性，需通过get_state()['board']获取
+        return self.game.get_state()['board'].copy()
 
     def _get_action_mask(self):
         """获取动作掩码"""
@@ -86,4 +86,4 @@ class SnakeEnv(BaseEnv):
         cloned_game = self.game.clone()
         cloned_env = SnakeEnv(self.board_size)
         cloned_env.game = cloned_game
-        return cloned_env 
+        return cloned_env

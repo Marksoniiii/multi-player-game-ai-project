@@ -5,6 +5,7 @@
 import random
 import numpy as np
 from agents.base_agent import BaseAgent
+import heapq
 
 class SnakeAI(BaseAgent):
     """贪吃蛇AI智能体"""
@@ -32,26 +33,19 @@ class SnakeAI(BaseAgent):
         
         head = snake[0]
         
-        # 寻找最近的食物
+        # 使用A*算法寻找到最近食物的路径
         if game.foods:
             target_food = self._find_nearest_food(head, game.foods)
-            best_action = self._move_towards_target(head, target_food, current_direction, game)
+            path = self._a_star_pathfinding(head, target_food, game)
             
-            # 检查这个动作是否安全
-            if self._is_safe_action(best_action, head, game):
-                return best_action
+            if path and len(path) > 1:
+                next_pos = path[1]  # path[0]是当前位置
+                action = self._pos_to_action(head, next_pos)
+                if action in valid_actions:
+                    return action
         
-        # 如果没有安全的路径到食物，寻找安全的移动
-        safe_actions = []
-        for action in valid_actions:
-            if self._is_safe_action(action, head, game):
-                safe_actions.append(action)
-        
-        if safe_actions:
-            return random.choice(safe_actions)
-        
-        # 如果没有安全动作，随机选择
-        return random.choice(valid_actions)
+        # 如果A*失败，使用安全策略
+        return self._get_safe_action(head, game, valid_actions)
     
     def _find_nearest_food(self, head, foods):
         """找到最近的食物"""
@@ -66,46 +60,77 @@ class SnakeAI(BaseAgent):
         
         return nearest_food
     
-    def _move_towards_target(self, head, target, current_direction, game):
-        """向目标移动"""
-        head_x, head_y = head
-        target_x, target_y = target
+    def _a_star_pathfinding(self, start, goal, game):
+        """A*寻路算法"""
+        def heuristic(a, b):
+            return abs(a[0] - b[0]) + abs(a[1] - b[1])
         
-        # 计算到目标的方向
-        dx = target_x - head_x
-        dy = target_y - head_y
+        def get_neighbors(pos):
+            x, y = pos
+            neighbors = []
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = x + dx, y + dy
+                if (0 <= nx < game.board_size and 0 <= ny < game.board_size):
+                    # 检查是否撞到蛇身（但允许撞到尾部，因为尾部会移动）
+                    if ((nx, ny) not in game.snake1[:-1] and 
+                        (nx, ny) not in game.snake2[:-1]):
+                        neighbors.append((nx, ny))
+            return neighbors
         
-        # 优先级：距离较远的轴优先
-        if abs(dx) > abs(dy):
-            if dx > 0:
-                return (1, 0)  # 下
-            elif dx < 0:
-                return (-1, 0)  # 上
+        open_set = [(0, start)]
+        came_from = {}
+        g_score = {start: 0}
+        f_score = {start: heuristic(start, goal)}
         
-        if dy > 0:
-            return (0, 1)  # 右
-        elif dy < 0:
-            return (0, -1)  # 左
+        while open_set:
+            current = heapq.heappop(open_set)[1]
+            
+            if current == goal:
+                # 重构路径
+                path = []
+                while current in came_from:
+                    path.append(current)
+                    current = came_from[current]
+                path.append(start)
+                return path[::-1]
+            
+            for neighbor in get_neighbors(current):
+                tentative_g = g_score[current] + 1
+                
+                if neighbor not in g_score or tentative_g < g_score[neighbor]:
+                    came_from[neighbor] = current
+                    g_score[neighbor] = tentative_g
+                    f_score[neighbor] = tentative_g + heuristic(neighbor, goal)
+                    heapq.heappush(open_set, (f_score[neighbor], neighbor))
         
-        # 如果已经在目标位置，保持当前方向
-        return current_direction
+        return None  # 没有找到路径
     
-    def _is_safe_action(self, action, head, game):
-        """检查动作是否安全"""
-        # action已经是方向元组 (dx, dy)
-        direction = action
-        new_head = (head[0] + direction[0], head[1] + direction[1])
+    def _pos_to_action(self, current_pos, next_pos):
+        """将位置转换为动作"""
+        dx = next_pos[0] - current_pos[0]
+        dy = next_pos[1] - current_pos[1]
         
-        # 检查边界
-        if (new_head[0] < 0 or new_head[0] >= game.board_size or
-            new_head[1] < 0 or new_head[1] >= game.board_size):
-            return False
+        return (dx, dy)
+    
+    def _get_safe_action(self, head, game, valid_actions):
+        """获取安全的动作"""
+        safe_actions = []
         
-        # 检查是否撞到蛇身
-        if new_head in game.snake1[:-1] or new_head in game.snake2[:-1]:
-            return False
+        for action in valid_actions:
+            # action已经是方向元组
+            new_head = (head[0] + action[0], head[1] + action[1])
+            
+            # 检查是否安全
+            if (0 <= new_head[0] < game.board_size and 
+                0 <= new_head[1] < game.board_size and
+                new_head not in game.snake1[:-1] and 
+                new_head not in game.snake2[:-1]):
+                safe_actions.append(action)
         
-        return True
+        if safe_actions:
+            return random.choice(safe_actions)
+        
+        return random.choice(valid_actions)
 
 
 class SmartSnakeAI(BaseAgent):
@@ -162,8 +187,6 @@ class SmartSnakeAI(BaseAgent):
     
     def _a_star_pathfinding(self, start, goal, game):
         """A*寻路算法"""
-        from heapq import heappush, heappop
-        
         def heuristic(a, b):
             return abs(a[0] - b[0]) + abs(a[1] - b[1])
         
@@ -185,7 +208,7 @@ class SmartSnakeAI(BaseAgent):
         f_score = {start: heuristic(start, goal)}
         
         while open_set:
-            current = heappop(open_set)[1]
+            current = heapq.heappop(open_set)[1]
             
             if current == goal:
                 # 重构路径
@@ -203,7 +226,7 @@ class SmartSnakeAI(BaseAgent):
                     came_from[neighbor] = current
                     g_score[neighbor] = tentative_g
                     f_score[neighbor] = tentative_g + heuristic(neighbor, goal)
-                    heappush(open_set, (f_score[neighbor], neighbor))
+                    heapq.heappush(open_set, (f_score[neighbor], neighbor))
         
         return None  # 没有找到路径
     
@@ -232,4 +255,4 @@ class SmartSnakeAI(BaseAgent):
         if safe_actions:
             return random.choice(safe_actions)
         
-        return random.choice(valid_actions) 
+        return random.choice(valid_actions)

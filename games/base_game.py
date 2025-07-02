@@ -25,7 +25,9 @@ class BaseGame(ABC):
     
     @abstractmethod
     def reset(self) -> Dict[str, Any]:
-        """重置游戏状态"""
+        """重置游戏状态，子类需清理所有状态变量
+        建议：self.move_count = 0, self.history = [], self.current_player = 1, self.game_state = ONGOING
+        """
         pass
     
     @abstractmethod
@@ -46,12 +48,12 @@ class BaseGame(ABC):
     
     @abstractmethod
     def get_valid_actions(self, player: int = None) -> List[Any]:
-        """获取有效动作列表"""
+        """获取有效动作列表，建议支持player参数，便于多智能体扩展"""
         pass
     
     @abstractmethod
     def is_terminal(self) -> bool:
-        """检查游戏是否结束"""
+        """检查游戏是否结束，需考虑平局、超时、最大步数等"""
         pass
     
     @abstractmethod
@@ -61,12 +63,12 @@ class BaseGame(ABC):
     
     @abstractmethod
     def get_state(self) -> Dict[str, Any]:
-        """获取当前游戏状态"""
+        """获取当前游戏状态，建议包含棋盘、玩家、历史等"""
         pass
     
     @abstractmethod
     def render(self) -> Any:
-        """渲染游戏画面"""
+        """渲染游戏画面，支持命令行和GUI"""
         pass
     
     def switch_player(self):
@@ -86,7 +88,7 @@ class BaseGame(ABC):
         return False
     
     def update_game_state(self):
-        """更新游戏状态"""
+        """更新游戏状态，自动判断胜负/平局/超时"""
         if self.is_terminal():
             winner = self.get_winner()
             if winner == 1:
@@ -101,7 +103,7 @@ class BaseGame(ABC):
             self.game_state = config.GameState.DRAW
     
     def get_game_info(self) -> Dict[str, Any]:
-        """获取游戏信息"""
+        """获取游戏信息，便于环境和UI展示"""
         return {
             'current_player': self.current_player,
             'game_state': self.game_state,
@@ -112,7 +114,11 @@ class BaseGame(ABC):
         }
     
     def record_move(self, player: int, action: Any, result: Dict[str, Any] = None):
-        """记录移动"""
+        """记录移动，建议所有step后调用。自动校验player和action合法性。"""
+        if player not in [1, 2]:
+            raise ValueError(f"player必须为1或2，当前为{player}")
+        if action is None:
+            raise ValueError("action不能为空")
         move_record = {
             'player': player,
             'action': action,
@@ -124,20 +130,17 @@ class BaseGame(ABC):
         self.last_move_time = time.time()
     
     def get_legal_actions(self, player: int = None) -> List[Any]:
-        """获取合法动作（别名）"""
+        """获取合法动作（别名，兼容旧代码）"""
         return self.get_valid_actions(player)
     
     def clone(self) -> 'BaseGame':
-        """克隆游戏状态"""
-        # 子类需要实现具体的克隆逻辑
-        raise NotImplementedError("子类必须实现clone方法")
-    
+        """克隆游戏状态，子类需实现深拷贝。建议用copy.deepcopy或自定义clone。"""
+        raise NotImplementedError("子类必须实现clone方法，否则无法用于AI搜索/回溯")
+
     def get_action_space(self) -> Any:
-        """获取动作空间"""
-        # 子类需要实现具体的动作空间定义
+        """获取动作空间，子类需实现。建议返回所有可能动作的列表或空间对象。"""
         raise NotImplementedError("子类必须实现get_action_space方法")
-    
+
     def get_observation_space(self) -> Any:
-        """获取观察空间"""
-        # 子类需要实现具体的观察空间定义
-        raise NotImplementedError("子类必须实现get_observation_space方法") 
+        """获取观察空间，子类需实现。建议返回状态空间结构。"""
+        raise NotImplementedError("子类必须实现get_observation_space方法")
