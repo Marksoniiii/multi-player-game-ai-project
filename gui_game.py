@@ -183,7 +183,14 @@ class MultiGameGUI:
             self.ai_agent = RandomBot(name="Random AI", player_id=2)
         elif self.selected_ai == "MinimaxBot":
             if self.current_game == "gomoku":
-                self.ai_agent = MinimaxBot(name="Minimax AI", player_id=2, max_depth=3)
+            # 修改Minimax AI智能体(fix)
+                self.ai_agent = MinimaxBot(
+                player=2,
+                board_size=self.game_config['board_size'],
+                search_depth=self.ai_difficulty,
+                env=self.env,
+                name="Minimax AI" # This is now handled by **kwargs in the bot
+            )
             else:
                 self.ai_agent = SnakeAI(name="Snake AI", player_id=2)
         elif self.selected_ai == "MCTSBot":
