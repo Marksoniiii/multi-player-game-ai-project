@@ -1,7 +1,7 @@
 import time
 import numpy as np
 from agents.base_agent import BaseAgent
-
+# 使用Minimax算法的AI Bot
 class MinimaxBot(BaseAgent):
     """
     一个经过优化的Minimax AI Bot。
