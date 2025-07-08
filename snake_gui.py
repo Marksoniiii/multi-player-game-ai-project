@@ -192,31 +192,26 @@ class SnakeGUI:
             pygame.K_RIGHT: (0, 1),  # 右
             pygame.K_d: (0, 1)
         }
-        
         if key in key_to_action:
             action = key_to_action[key]
-            self._make_move(action)
-    
-    def _make_move(self, action):
+            # 玩家输入时直接更新方向，不切换current_agent
+            self._make_move(action, switch_player=False)
+
+    def _make_move(self, action, switch_player=True):
         """执行移动"""
         if self.game_over or self.paused:
             return
-        
         try:
-            # 执行动作
             observation, reward, terminated, truncated, info = self.env.step(action)
-            
-            # 检查游戏是否结束
             if terminated or truncated:
                 self.game_over = True
                 self.winner = self.env.get_winner()
             else:
-                # 切换玩家
-                self._switch_player()
-        
+                if switch_player:
+                    self._switch_player()
         except Exception as e:
             print(f"Move execution failed: {e}")
-    
+
     def _switch_player(self):
         """切换玩家"""
         if isinstance(self.current_agent, HumanAgent):
@@ -244,27 +239,24 @@ class SnakeGUI:
                 observation = self.env._get_observation()
                 action = self.current_agent.get_action(observation, self.env)
                 
-                if action:
-                    self._make_move(action)
+                if not action:
+                    # 如果AI未返回动作，保持原方向
+                    if self.env.game.current_player == 2:
+                        action = self.env.game.direction2
+                    else:
+                        action = (0, 1)
                 
+                self._make_move(action)
                 self.thinking = False
                 
             except Exception as e:
                 print(f"AI thinking failed: {e}")
                 self.thinking = False
         
-        # 人类玩家回合 - 贪吃蛇需要持续移动
+        # 玩家回合：自动推进蛇（如果没有输入则保持原方向）
         elif isinstance(self.current_agent, HumanAgent) and not self.thinking:
-            # 获取当前方向并继续移动
-            current_direction = None
-            if self.env.game.current_player == 1:
-                current_direction = self.env.game.direction1
-            else:
-                current_direction = self.env.game.direction2
-            
-            # 直接使用当前方向
-            action = current_direction
-            self._make_move(action)
+            current_direction = self.env.game.direction1
+            self._make_move(current_direction, switch_player=False)
     
     def draw(self):
         """绘制游戏界面"""
@@ -465,4 +457,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()
