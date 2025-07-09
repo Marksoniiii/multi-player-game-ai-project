@@ -63,35 +63,37 @@ def main():
     # **核心修复**：重构游戏主循环
     running = True
     while running:
-        ui.draw_board()
-        current_agent = players[game.current_player]
-        
-        # AI回合的逻辑
-        if isinstance(current_agent, (MCTSAgent, MiniMaxAgent)):
+        # 只要当前是AI且游戏未结束，就让AI一直走
+        while isinstance(players[game.current_player], (MCTSAgent, MiniMaxAgent)) and not game.is_terminal():
             pygame.display.set_caption("AI is thinking...")
             pygame.display.flip()
-            action = current_agent.get_action()
+            action = players[game.current_player].get_action()
             if action:
                 game.step(action)
-                if game.is_terminal():
-                    running = False
-            # AI下完棋后，循环会自然继续，UI会刷新，然后轮到人类玩家
-            continue # 立即进入下一次循环，以刷新UI并检查游戏状态
-            
-        # 人类玩家的回合的逻辑
+            else:
+                break  # AI无可行动作
+            ui.draw_board()
+            pygame.display.flip()
+            pygame.event.clear()
+        # 到这里一定是玩家回合或游戏结束
+        if game.is_terminal():
+            break
+        pygame.display.set_caption("Your turn")
+        ui.draw_board()
+        pygame.display.flip()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             if event.type == pygame.MOUSEBUTTONDOWN:
-                if isinstance(current_agent, HumanAgent):
+                if isinstance(players[game.current_player], HumanAgent):
                     action = ui.handle_click(event.pos)
                     if action:
                         game.step(action)
                         if game.is_terminal():
                             running = False
-        
-        ui.draw_board() # 每次循环都重绘棋盘和状态
-        pygame.display.flip() # 更新整个屏幕显示
+        # 每次循环都重绘棋盘和状态
+        ui.draw_board()
+        pygame.display.flip()
 
     # 游戏结束后等待
     while True:
