@@ -56,50 +56,63 @@ def main():
     # agent2 = MCTSAgent(ai_player, game, n_simulations=1000)
     agent2 = MiniMaxAgent(game, ai_player, depth=1)
 
-    players = {1: agent1 if player_starts else agent2, 2: agent2 if player_starts else agent1}
-    
+    # 修正：players[1]始终为先手，players[2]为后手
+    if player_starts:
+        players = {1: agent1, 2: agent2}
+        game.current_player = 1  # 确保玩家先手时，当前玩家为玩家
+    else:
+        players = {1: agent2, 2: agent1}
+        game.current_player = 1  # 确保AI先手时，当前玩家为AI
+
+    # 关键修改：在重置游戏前保存当前玩家状态
+    initial_current_player = game.current_player
     game.reset()
-    
-    # **核心修复**：重构游戏主循环
+    # 重置后恢复当前玩家状态
+    game.current_player = initial_current_player
+
     running = True
     while running:
-        # 只要当前是AI且游戏未结束，就让AI一直走
+        # AI自动回合
         while isinstance(players[game.current_player], (MCTSAgent, MiniMaxAgent)) and not game.is_terminal():
             pygame.display.set_caption("AI is thinking...")
+            ui.draw_board(is_human_turn=False)
             pygame.display.flip()
             action = players[game.current_player].get_action()
             if action:
                 game.step(action)
             else:
-                break  # AI无可行动作
-            ui.draw_board()
-            pygame.display.flip()
+                break
             pygame.event.clear()
-        # 到这里一定是玩家回合或游戏结束
+        # 玩家回合
         if game.is_terminal():
             break
         pygame.display.set_caption("Your turn")
-        ui.draw_board()
+        ui.draw_board(is_human_turn=True)
         pygame.display.flip()
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if isinstance(players[game.current_player], HumanAgent):
-                    action = ui.handle_click(event.pos)
-                    if action:
-                        game.step(action)
-                        if game.is_terminal():
-                            running = False
-        # 每次循环都重绘棋盘和状态
-        ui.draw_board()
+        waiting_player = True
+        while waiting_player and not game.is_terminal():
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                    waiting_player = False
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if isinstance(players[game.current_player], HumanAgent):
+                        action = ui.handle_click(event.pos)
+                        if action:
+                            game.step(action)
+                            waiting_player = False
+                            if game.is_terminal():
+                                running = False
+        # 只在回合切换时刷新
+        ui.draw_board(is_human_turn=isinstance(players[game.current_player], HumanAgent))
         pygame.display.flip()
 
-    # 游戏结束后等待
+    # 游戏结束后等待退出
     while True:
-        ui.draw_board() # 持续显示最终棋盘
+        ui.draw_board(is_human_turn=False)
+        pygame.display.flip()
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+            if event.type == pygame.QUIT or event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
                 pygame.quit()
                 sys.exit()
 

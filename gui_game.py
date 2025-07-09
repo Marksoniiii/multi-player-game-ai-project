@@ -183,6 +183,8 @@ class MultiGameGUI:
             self.env = GomokuEnv(board_size=15, win_length=5)
             self.cell_size = 30
             self.update_interval = 1.0  # 五子棋不需要频繁更新
+            # 创建人类玩家智能体
+            self.human_agent = HumanAgent(name="Human Player", player_id=1)
         elif game_type == "snake":
             self.env = SnakeEnv(board_size=20)
             self.cell_size = 25
