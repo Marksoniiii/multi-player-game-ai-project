@@ -45,15 +45,29 @@ class GomokuGame(BaseGame):
         if self.board[row, col] != 0:
             return self.get_state(), -1, True, {'error': 'Invalid move'}
         
-        self.board[row, col] = self.current_player
-        self.history.append((self.current_player, (row, col)))
+        # 记录当前玩家并落子
+        player_who_moved = self.current_player
+        self.board[row, col] = player_who_moved
+        self.history.append((player_who_moved, (row, col)))
         self.move_count += 1
+        
+        # **核心修复**：在切换玩家之前，先基于当前落子的玩家检查游戏是否结束
         done = self.is_terminal()
-        reward = 1 if self.get_winner() == self.current_player else 0
-        info = {}
-        if done and self.get_winner() is None:
+        winner = self.get_winner()
+        
+        # 根据实际获胜者计算奖励
+        if winner == player_who_moved:
+            reward = 1.0
+        elif done and winner is None: # 平局
             reward = 0.5
-        self.switch_player()
+        else:
+            reward = 0.0
+            
+        info = {'winner': winner}
+
+        # 如果游戏没有结束，才切换玩家
+        if not done:
+            self.switch_player()
         
         return self.get_state(), reward, done, info
     
@@ -179,4 +193,4 @@ class GomokuGame(BaseGame):
     
     def get_legal_moves(self) -> List[Tuple[int, int]]:
         """获取合法移动（别名）"""
-        return self.get_valid_actions() 
+        return self.get_valid_actions()
