@@ -128,13 +128,16 @@ class SnakeGUI:
         current_time = time.time()
         if current_time - self.last_update_time >= self.update_interval:
             self.last_update_time = current_time
-            
-            ai_action = self.ai_agent.get_action(self.env.game.get_state())
+            state = self.env.game.get_state()
+            # 统一传递两个参数，兼容所有AI
+            try:
+                ai_action = self.ai_agent.get_action(state, self.env)
+            except TypeError:
+                # 兼容只接受一个参数的AI
+                ai_action = self.ai_agent.get_action(state)
             actions = {1: self.human_direction, 2: ai_action}
-            
             # 【已修复】正确接收来自 env.step 的5个返回值，修复崩溃问题
             _, _, terminated, truncated, _ = self.env.step(actions)
-            
             if terminated or truncated:
                 self.game_over = True
                 self.winner = self.env.get_winner()
