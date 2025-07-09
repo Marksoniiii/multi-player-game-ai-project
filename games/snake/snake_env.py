@@ -22,8 +22,10 @@ class SnakeEnv(gym.Env):
 
     def step(self, actions: Dict[int, Tuple[int, int]]) -> Tuple[Dict, float, bool, bool, Dict]:
         """
-        【已修复】确保返回值与 Gymnasium 标准一致（5个值），这是修复崩溃的关键
+        兼容旧接口：如果actions是tuple，则自动转为{1: actions}
         """
+        if isinstance(actions, tuple):
+            actions = {1: actions}
         obs, reward, terminated, info = self.game.step(actions)
         truncated = self.game.move_count >= self.game.game_config.get('max_moves', 1000)
         return obs, reward, terminated, truncated, info
@@ -37,3 +39,11 @@ class SnakeEnv(gym.Env):
 
     def get_winner(self) -> Optional[int]:
         return self.game.get_winner()
+
+    def _get_observation(self):
+        """兼容旧接口，返回当前观测"""
+        return self.game.get_state()
+
+    def get_valid_actions(self, player: int = None):
+        """兼容旧接口，返回可用动作"""
+        return self.game.get_valid_actions(player)
