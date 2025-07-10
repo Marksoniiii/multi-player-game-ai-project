@@ -557,6 +557,11 @@ class MultiGameGUI:
         title_text = self.font_medium.render("Game Selection:", True, COLORS['BLACK'])
         self.screen.blit(title_text, (self.buttons['gomoku_game']['rect'].x, self.buttons['gomoku_game']['rect'].y - 32))
 
+        # 绘制先手选择标题
+        if self.current_game == "gomoku":
+            first_player_title = self.font_medium.render("First Player:", True, COLORS['BLACK'])
+            self.screen.blit(first_player_title, (self.buttons['player_first']['rect'].x, self.buttons['player_first']['rect'].y - 25))
+
         ai_title_text = self.font_medium.render("AI Selection:", True, COLORS['BLACK'])
         self.screen.blit(ai_title_text, (self.buttons['random_ai']['rect'].x, self.buttons['random_ai']['rect'].y - 32))
 
