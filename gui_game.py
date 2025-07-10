@@ -10,7 +10,7 @@ import os
 from typing import Optional, Tuple, Dict, Any
 from games.gomoku import GomokuGame, GomokuEnv
 from games.snake import SnakeGame, SnakeEnv
-from agents import RandomBot, MinimaxBot, MCTSBot, HumanAgent, SnakeAI, SmartSnakeAI
+from agents import RandomBot, MinimaxBot, MCTSBot, HumanAgent, SnakeAI
 import config
 
 # 颜色定义
@@ -203,7 +203,7 @@ class MultiGameGUI:
         if self.current_game == "snake":
             ai_map = {
                 "Basic AI": SnakeAI,
-                "Smart AI": SmartSnakeAI,
+                "Smart AI": SnakeAI,
                 "Random AI": RandomBot
             }
             ai_class = ai_map.get(self.selected_ai_name, SnakeAI)

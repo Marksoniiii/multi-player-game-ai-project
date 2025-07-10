@@ -1,186 +1,245 @@
 """
-MCTS Bot - 最后修复版
+MCTS Bot - 简洁有效版本
 """
 import time
 import random
 import math
-from typing import Dict, Any, Optional, List, Tuple
-
+import numpy as np
+from typing import Any, Dict, List
 from agents.base_agent import BaseAgent
-from agents.ai_bots.minimax_bot import MinimaxBot # 导入评估器
 import config
 
-# MCTSNode 类的定义保持不变
 class MCTSNode:
-    """MCTS节点 - 结构更标准"""
-    def __init__(self, game_state, parent=None, action=None):
+    """MCTS节点，为启发式搜索优化"""
+    
+    def __init__(self, game_state, parent=None, action=None, prior=0.0):
         self.state = game_state
         self.parent = parent
         self.action = action
         self.children = []
         self.wins = 0
         self.visits = 0
-        self.untried_actions = self.state.get_valid_actions()
+        self.prior = prior  # 走法的先验概率/价值
+        self.untried_actions = list(self.state.get_valid_actions())
+        self._is_terminal = self.state.is_terminal()
 
-    def select_child(self, exploration_constant):
-        """使用UCT (UCB1 applied to trees) 公式选择子节点"""
-        best_score = -1
+    def select_child(self, exploration_constant=1.414):
+        """使用PUCT (Polynomial Upper Confidence Trees) 公式选择子节点"""
+        # PUCT = Q(s,a) + U(s,a)
+        # Q(s,a) = wins / visits
+        # U(s,a) = c_puct * P(s,a) * sqrt(sum_visits) / (1 + visits)
+        best_value = -float('inf')
         best_child = None
         for child in self.children:
-            if child.visits == 0:
-                return child
+            q_value = child.wins / child.visits if child.visits > 0 else 0
+            u_value = exploration_constant * child.prior * math.sqrt(self.visits) / (1 + child.visits)
+            puct_value = q_value + u_value
             
-            exploit = child.wins / child.visits
-            explore = exploration_constant * math.sqrt(math.log(self.visits) / child.visits)
-            score = exploit + explore
-            
-            if score > best_score:
-                best_score = score
+            if puct_value > best_value:
+                best_value = puct_value
                 best_child = child
         return best_child
 
-    def expand(self):
-        """从未尝试的动作中扩展一个子节点"""
-        action = self.untried_actions.pop(0)
+    def expand(self, action, prior):
+        """根据一个动作和其先验概率来扩展节点"""
         next_state = self.state.clone()
         next_state.step(action)
-        child_node = MCTSNode(next_state, parent=self, action=action)
-        self.children.append(child_node)
-        return child_node
+        child = MCTSNode(next_state, parent=self, action=action, prior=prior)
+        self.children.append(child)
+        self.untried_actions.remove(action)
+        return child
 
-# --- MCTSBot 主类 ---
+    def update(self, result):
+        self.visits += 1
+        self.wins += result
+
 class MCTSBot(BaseAgent):
     """
-    终极版MCTS Bot
-    1.  **强大的紧急威胁评估**：在搜索前检查连五、活四、双三等关键棋形。
-    2.  **时间预算搜索**：在固定时间内尽可能多地模拟，保证响应速度。
-    3.  **启发式模拟**：使用Minimax评估函数指导模拟，提升模拟质量。
-    4.  **健壮的反向传播**：确保节点价值被正确更新。
+    高级MCTS Bot - 融合专家策略
+    
+    核心特性:
+    1. AlphaGo式PUCT选择策略
+    2. 由棋形评估驱动的启发式模拟和扩展
+    3. 强大的棋形识别能力
     """
-    # ==================== BUG修复点 ====================
-    # 在参数列表中增加了 **kwargs，以接收并忽略所有多余的参数（如旧的 simulation_count）
+    
     def __init__(self, name: str = "MCTSBot", player_id: int = 1, **kwargs):
         super().__init__(name, player_id)
         ai_config = config.AI_CONFIGS.get('mcts', {})
-        self.timeout = ai_config.get('timeout', 5.0) 
-        self.exploration_constant = ai_config.get('exploration_constant', 1.414)
-        self.evaluator = MinimaxBot(player_id=self.player_id)
+        self.timeout = ai_config.get('timeout', 3.0)
+        self.max_simulations = ai_config.get('max_simulations', 1000)
+        self.exploration_constant = ai_config.get('exploration_constant', 1.5)
+        
+        # 棋形和分数 - 从MinimaxBot借鉴
+        self.patterns = {
+            'FIVE': 100000, 'OPEN_FOUR': 10000, 'RUSH_FOUR': 5000,
+            'OPEN_THREE': 2000, 'RUSH_THREE': 800, 'OPEN_TWO': 400,
+            'RUSH_TWO': 100, 'BLOCKED_ONE': 5
+        }
 
     def get_action(self, observation: Any, env: Any) -> Any:
         start_time = time.time()
         root_state = env.game.clone()
         
-        # 1. 紧急威胁评估 (强化直觉)
-        urgent_move = self._find_urgent_move(root_state)
-        if urgent_move:
-            print(f"MCTS AI ({self.name}) 发现紧急棋步: {urgent_move}")
-            return urgent_move
+        # 紧急检查
+        critical_move = self._check_urgent_moves(root_state)
+        if critical_move:
+            return critical_move
 
-        # 2. MCTS搜索 (时间预算内深度思考)
-        root_node = MCTSNode(root_state)
+        action_priors = self._get_action_priors(root_state, root_state.get_valid_actions())
+        root_node = MCTSNode(root_state, prior=1.0)
         
-        simulation_count = 0
-        while time.time() - start_time < self.timeout:
-            node = root_node
+        sim_count = 0
+        while time.time() - start_time < self.timeout and sim_count < self.max_simulations:
+            node = self._select(root_node)
             
-            # --- 选择 (Selection) ---
-            while not node.untried_actions and node.children:
-                node = node.select_child(self.exploration_constant)
+            if not node._is_terminal:
+                node = self._expand(node)
             
-            # --- 扩展 (Expansion) ---
-            if node.untried_actions:
-                node = node.expand()
-            
-            # --- 模拟 (Simulation) ---
-            winner = self._heuristic_simulate(node.state)
-            
-            # --- 反向传播 (Backpropagation) ---
-            self._backpropagate(node, winner)
-            
-            simulation_count += 1
-
-        elapsed_time = time.time() - start_time
-        print(f">>> MCTS Bot ({self.name}) 在 {elapsed_time:.2f}s 内完成了 {simulation_count} 次模拟。")
+            result = self._simulate(node)
+            self._backpropagate(node, result)
+            sim_count += 1
         
-        # 3. 最终决策
-        if not root_node.children:
-            return random.choice(env.get_valid_actions())
+        return self._get_best_action(root_node)
 
-        best_child = max(root_node.children, key=lambda c: c.visits)
-        return best_child.action
-
-    def _find_urgent_move(self, state) -> Optional[Tuple[int, int]]:
-        """按优先级顺序查找最紧急的落子点（连五、活四、双三等）"""
-        valid_actions = state.get_valid_actions()
-        my_id = self.player_id
-        opponent_id = 3 - my_id
-
-        priority_list = [
-            {'player': my_id, 'score_ge': 10000, 'desc': "我方连五"},
-            {'player': opponent_id, 'score_ge': 10000, 'desc': "对方连五"},
-            {'player': my_id, 'score_ge': 4000, 'desc': "我方活四"},
-            {'player': opponent_id, 'score_ge': 4000, 'desc': "对方活四"},
-            {'player': my_id, 'score_ge': 800, 'desc': "我方双三"},
-            {'player': opponent_id, 'score_ge': 800, 'desc': "对方双三"},
-        ]
-
-        for priority in priority_list:
-            player = priority['player']
-            threshold = priority['score_ge']
+    def _select(self, node):
+        current_node = node
+        while not current_node._is_terminal:
+            if not current_node.children:
+                return current_node
             
-            initial_score = self.evaluator.calculate_player_score(state.board, player)
-            
-            for action in valid_actions:
-                temp_board = state.board.copy()
-                temp_board[action[0], action[1]] = player
-                
-                new_score = self.evaluator.calculate_player_score(temp_board, player)
-                
-                if (new_score - initial_score) >= threshold:
-                    print(f"    紧急评估发现: {priority['desc']} @ {action}")
-                    return action
-        return None
+            selected_child = current_node.select_child(self.exploration_constant)
+            if selected_child is None:
+                return current_node # Return current node if no child can be selected
+            current_node = selected_child
 
-    def _heuristic_simulate(self, state) -> Optional[int]:
-        """使用Minimax评估函数进行高质量模拟"""
-        temp_state = state.clone()
-        for _ in range(10): 
-            if temp_state.is_terminal():
+        return current_node
+
+    def _expand(self, node):
+        if not node.untried_actions:
+            return node
+        
+        action_priors = self._get_action_priors(node.state, node.untried_actions)
+        prior, action = action_priors[0] # 选择评估最高的动作进行扩展
+        
+        return node.expand(action, prior)
+
+    def _simulate(self, node):
+        current_state = node.state.clone()
+        
+        for _ in range(30): # 限制模拟深度
+            if current_state.is_terminal():
                 break
-
-            valid_actions = temp_state.get_valid_actions()
+            
+            valid_actions = current_state.get_valid_actions()
             if not valid_actions:
                 break
             
-            best_action = None
-            best_score = -float('inf')
-            
-            self.evaluator.player_id = temp_state.current_player
-            
-            for action in valid_actions:
-                next_state_eval = temp_state.clone()
-                next_state_eval.step(action)
-                score = self.evaluator.evaluate(next_state_eval)
-                if score > best_score:
-                    best_score = score
-                    best_action = action
-            
-            if best_action:
-                temp_state.step(best_action)
-            else: 
-                break
-            
-        return temp_state.get_winner()
+            action_priors = self._get_action_priors(current_state, valid_actions, for_simulation=True)
+            action = self._select_action_by_priors(action_priors)
+            current_state.step(action)
+        
+        winner = current_state.get_winner()
+        if winner == self.player_id: return 1.0
+        if winner is None: return 0.5 # 平局
+        return 0.0 # 输
 
-    def _backpropagate(self, node, winner):
-        """完全正确的反向传播逻辑"""
-        current_node = node
-        while current_node is not None:
-            current_node.visits += 1
-            parent_player_id = 3 - current_node.state.current_player
-            if winner == parent_player_id:
-                current_node.wins += 1.0
-            elif winner is None:
-                current_node.wins += 0.5
+    def _backpropagate(self, node, result):
+        current = node
+        while current is not None:
+            current.update(result)
+            result = 1.0 - result # 对手视角
+            current = current.parent
+
+    def _get_best_action(self, root_node):
+        if not root_node.children:
+            valid_actions = root_node.state.get_valid_actions()
+            return random.choice(valid_actions) if valid_actions else None
             
-            current_node = current_node.parent
+        best_child = max(root_node.children, key=lambda c: c.visits)
+        return best_child.action
+
+    def _get_action_priors(self, state, actions, for_simulation=False):
+        """获取所有动作的先验价值"""
+        priors = []
+        for action in actions:
+            # 评估己方下这步棋的价值
+            my_score = self._evaluate_move(state, action, self.player_id)
+            # 评估对手下这步棋的价值 (防守价值)
+            opponent_score = self._evaluate_move(state, action, 3 - self.player_id)
+            priors.append((my_score + opponent_score, action))
+        
+        priors.sort(key=lambda x: x[0], reverse=True)
+        
+        # 归一化为概率
+        total_score = sum(p[0] for p in priors) + 1e-9 # 避免除以0
+        normalized_priors = [(score / total_score, action) for score, action in priors]
+        
+        return normalized_priors
+
+    def _select_action_by_priors(self, priors):
+        """根据先验概率随机选择动作"""
+        actions = [p[1] for p in priors]
+        probabilities = [p[0] for p in priors]
+        return random.choices(actions, weights=probabilities, k=1)[0]
+    
+    def _evaluate_move(self, state, action, player_id):
+        """使用棋形评估来评估一个动作"""
+        board_copy = state.board.copy()
+        board_copy[action] = player_id
+        return self._evaluate_position(board_copy, player_id)
+
+    def _evaluate_position(self, board, player):
+        """评估棋盘上某个玩家的分数"""
+        score = 0
+        board_size = board.shape[0]
+        
+        for r in range(board_size):
+            for c in range(board_size):
+                if c <= board_size - 5: score += self._evaluate_window(board[r, c:c+5], player)
+                if r <= board_size - 5: score += self._evaluate_window(board[r:r+5, c], player)
+                if r <= board_size - 5 and c <= board_size - 5: score += self._evaluate_window([board[r+i, c+i] for i in range(5)], player)
+                if r <= board_size - 5 and c >= 4: score += self._evaluate_window([board[r+i, c-i] for i in range(5)], player)
+        return score
+
+    def _evaluate_window(self, window, player):
+        """评估一个窗口(五元组)的价值"""
+        window = list(window)
+        my_count = window.count(player)
+        opponent_count = window.count(3 - player)
+        empty_count = window.count(0)
+
+        if my_count > 0 and opponent_count > 0: return 0
+        if my_count == 0 and opponent_count == 0: return 1
+
+        if my_count == 5: return self.patterns['FIVE']
+        if my_count == 4 and empty_count == 1: return self.patterns['OPEN_FOUR']
+        if my_count == 3 and empty_count == 2: return self.patterns['OPEN_THREE']
+        if my_count == 3 and empty_count == 1: return self.patterns['RUSH_THREE']
+        if my_count == 2 and empty_count == 3: return self.patterns['OPEN_TWO']
+        
+        # 简化冲四的判断
+        if my_count == 4 and opponent_count == 0: return self.patterns['RUSH_FOUR']
+
+        return 0
+    
+    def _check_urgent_moves(self, state):
+        """检查并返回必胜或必须防守的棋"""
+        valid_actions = state.get_valid_actions()
+        opponent_id = 3 - self.player_id
+
+        # 检查自己是否有必胜棋
+        for action in valid_actions:
+            state_copy = state.clone()
+            state_copy.step(action)
+            if state_copy.get_winner() == self.player_id:
+                return action
+        
+        # 检查对手是否有必胜棋 (需要防守)
+        for action in valid_actions:
+            state_copy = state.clone()
+            state_copy.board[action] = opponent_id
+            if state_copy.get_winner() == opponent_id:
+                return action
+        
+        return None

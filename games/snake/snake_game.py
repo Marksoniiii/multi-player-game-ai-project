@@ -45,29 +45,61 @@ class SnakeGame(BaseGame):
         
         return self.get_state()
 
+    def _convert_action(self, action):
+        """将动作转换为标准的 (dx, dy) 元组格式"""
+        if isinstance(action, tuple) and len(action) == 2:
+            return action
+        elif isinstance(action, str):
+            action_map = {
+                'up': (-1, 0),
+                'down': (1, 0), 
+                'left': (0, -1),
+                'right': (0, 1)
+            }
+            return action_map.get(action.lower(), (0, 0))
+        else:
+            return (0, 0)  # 默认不移动
+
     def step(self, actions: Dict[int, Tuple[int, int]]) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any]]:
         """执行一步动作，同时处理两个玩家"""
-        action1 = actions.get(1, self.direction1)
-        action2 = actions.get(2, self.direction2)
+        # 转换动作格式
+        action1 = self._convert_action(actions.get(1, self.direction1))
+        action2 = self._convert_action(actions.get(2, self.direction2))
 
         if action1 and action1 != (-self.direction1[0], -self.direction1[1]):
             self.direction1 = action1
         if action2 and action2 != (-self.direction2[0], -self.direction2[1]):
             self.direction2 = action2
         
-        new_head1 = (self.snake1[0][0] + self.direction1[0], self.snake1[0][1] + self.direction1[1])
-        new_head2 = (self.snake2[0][0] + self.direction2[0], self.snake2[0][1] + self.direction2[1])
+        # 只有活着的蛇才计算新头部位置
+        new_head1: Optional[Tuple[int, int]] = None
+        new_head2: Optional[Tuple[int, int]] = None
+        
+        if self.alive1 and self.snake1:
+            new_head1 = (self.snake1[0][0] + self.direction1[0], self.snake1[0][1] + self.direction1[1])
+        
+        if self.alive2 and self.snake2:
+            new_head2 = (self.snake2[0][0] + self.direction2[0], self.snake2[0][1] + self.direction2[1])
 
-        p1_collided = self._is_collision(new_head1, self.snake1, self.snake2)
-        p2_collided = self._is_collision(new_head2, self.snake2, self.snake1)
+        # 检查碰撞
+        p1_collided = False
+        p2_collided = False
+        
+        if new_head1 is not None:
+            p1_collided = self._is_collision(new_head1, self.snake1, self.snake2)
+        
+        if new_head2 is not None:
+            p2_collided = self._is_collision(new_head2, self.snake2, self.snake1)
 
-        if new_head1 == new_head2:
+        # 处理头部碰撞
+        if new_head1 is not None and new_head2 is not None and new_head1 == new_head2:
             self.alive1, self.alive2 = False, False
         else:
             if p1_collided: self.alive1 = False
             if p2_collided: self.alive2 = False
 
-        if self.alive1:
+        # 移动蛇
+        if self.alive1 and new_head1 is not None:
             self.snake1.insert(0, new_head1)
             if new_head1 in self.foods:
                 self.foods.remove(new_head1)
@@ -75,7 +107,7 @@ class SnakeGame(BaseGame):
             else:
                 self.snake1.pop()
 
-        if self.alive2:
+        if self.alive2 and new_head2 is not None:
             self.snake2.insert(0, new_head2)
             if new_head2 in self.foods:
                 self.foods.remove(new_head2)
@@ -113,8 +145,13 @@ class SnakeGame(BaseGame):
     def get_state(self) -> Dict[str, Any]:
         board = np.zeros(self.board_shape, dtype=int)
         for x, y in self.foods: board[x, y] = 5
-        for i, (x, y) in enumerate(self.snake1): board[x, y] = 1 if i == 0 and self.alive1 else 2
-        for i, (x, y) in enumerate(self.snake2): board[x, y] = 3 if i == 0 and self.alive2 else 4
+        
+        # 处理蛇的身体
+        for i, (x, y) in enumerate(self.snake1): 
+            board[x, y] = 1 if i == 0 and self.alive1 else 2  # type: ignore
+        for i, (x, y) in enumerate(self.snake2): 
+            board[x, y] = 3 if i == 0 and self.alive2 else 4  # type: ignore
+        
         return {
             'board': board,
             'snake1': self.snake1, 'snake2': self.snake2,

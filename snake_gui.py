@@ -4,7 +4,7 @@ import sys
 import time
 from typing import Dict, Any
 from games.snake import SnakeEnv
-from agents import RandomBot, SnakeAI, SmartSnakeAI
+from agents import RandomBot, SnakeAI
 
 COLORS = {
     'WHITE': (255, 255, 255), 'BLACK': (0, 0, 0), 'RED': (255, 0, 0),
@@ -55,7 +55,7 @@ class SnakeGUI:
         
         return {
             'basic_ai': {'rect': pygame.Rect(start_x, 50, btn_w, btn_h), 'text': 'Basic AI', 'agent': SnakeAI},
-            'smart_ai': {'rect': pygame.Rect(start_x, 100, btn_w, btn_h), 'text': 'Smart AI', 'agent': SmartSnakeAI},
+            'smart_ai': {'rect': pygame.Rect(start_x, 100, btn_w, btn_h), 'text': 'Smart AI', 'agent': SnakeAI},
             'random_ai': {'rect': pygame.Rect(start_x, 150, btn_w, btn_h), 'text': 'Random AI', 'agent': RandomBot},
             'new_game': {'rect': pygame.Rect(start_x, 220, btn_w, btn_h), 'text': 'New Game', 'color': COLORS['GREEN']},
             'pause': {'rect': pygame.Rect(start_x, 270, btn_w, btn_h), 'text': 'Pause', 'color': COLORS['ORANGE']},
