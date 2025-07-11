@@ -16,15 +16,16 @@ def main():
     print("请选择游戏模式:")
     print("1. 多游戏GUI - 五子棋和贪吃蛇 (推荐)")
     print("2. 贪吃蛇专用GUI - 更好的贪吃蛇体验")
-    print("3. 五子棋命令行版本")
-    print("4. 贪吃蛇命令行版本")
-    print("5. 运行测试")
-    print("6. 退出")
+    print("3. 吃豆人游戏 - 双人对战 (新增)")
+    print("4. 五子棋命令行版本")
+    print("5. 贪吃蛇命令行版本")
+    print("6. 运行测试")
+    print("7. 退出")
     print()
     
     while True:
         try:
-            choice = input("请输入选择 (1-6): ").strip()
+            choice = input("请输入选择 (1-7): ").strip()
             
             if choice == '1':
                 print("\n🎯 启动多游戏图形界面...")
@@ -60,26 +61,46 @@ def main():
                 break
                 
             elif choice == '3':
+                print("\n🟡 启动吃豆人游戏...")
+                print("特性:")
+                print("- 双人对战模式")
+                print("- 迷宫探索和豆子收集")
+                print("- 实时分数统计")
+                print("- 简单易懂的控制方式")
+                print("控制说明:")
+                print("- 玩家1: W(上) A(左) S(下) D(右)")
+                print("- 玩家2: I(上) J(左) K(下) L(右)")
+                print("- 输入格式: 玩家1动作,玩家2动作")
+                print()
+                
+                if os.path.exists("pacman_gui.py"):
+                    subprocess.run([sys.executable, "pacman_gui.py"])
+                else:
+                    # 运行命令行版本
+                    subprocess.run([sys.executable, "pacman_main.py"])
+                break
+                
+            elif choice == '4':
                 print("\n♟️  启动五子棋命令行版本...")
                 subprocess.run([sys.executable, "main.py", "--game", "gomoku", "--player1", "human", "--player2", "random"])
                 break
                 
-            elif choice == '4':
+            elif choice == '5':
                 print("\n🐍 启动贪吃蛇命令行版本...")
                 subprocess.run([sys.executable, "main.py", "--game", "snake", "--player1", "human", "--player2", "snake_ai"])
                 break
                 
-            elif choice == '5':
+            elif choice == '6':
                 print("\n🧪 运行项目测试...")
                 subprocess.run([sys.executable, "test_project.py"])
                 break
                 
-            elif choice == '6':
+            elif choice == '7':
                 print("\n👋 再见！")
                 sys.exit(0)
                 
             else:
-                print("❌ 无效选择，请输入 1-6")
+                print("❌ 无效选择，请输入 1-7")
                 
         except KeyboardInterrupt:
             print("\n\n👋 再见！")

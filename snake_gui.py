@@ -30,9 +30,10 @@ class SnakeGUI:
         pygame.display.set_caption("Snake AI Battle")
         self.clock = pygame.time.Clock()
         
-        self.font_large = pygame.font.Font(None, 36)
-        self.font_medium = pygame.font.Font(None, 24)
-        self.font_small = pygame.font.Font(None, 20)
+        # 初始化支持中文的字体
+        self.font_large = self._init_font(36)
+        self.font_medium = self._init_font(24)
+        self.font_small = self._init_font(20)
         
         self.env = SnakeEnv(board_size=self.board_size)
         self.selected_ai_name = "Basic AI"
@@ -61,6 +62,39 @@ class SnakeGUI:
             'pause': {'rect': pygame.Rect(start_x, 270, btn_w, btn_h), 'text': 'Pause', 'color': COLORS['ORANGE']},
             'quit': {'rect': pygame.Rect(start_x, 320, btn_w, btn_h), 'text': 'Quit', 'color': COLORS['RED']}
         }
+
+    def _init_font(self, size: int):
+        """初始化支持中文的字体"""
+        # 尝试多种中文字体
+        chinese_fonts = [
+            'simhei',      # 黑体
+            'simsun',      # 宋体
+            'yahei',       # 雅黑
+            'microsoftyahei',  # 微软雅黑
+            'dengxian',    # 等线
+            'kaiti',       # 楷体
+            'fangsong',    # 仿宋
+            'arial unicode ms',  # Arial Unicode MS
+            'noto sans cjk sc',  # Noto Sans CJK SC
+        ]
+        
+        # 首先尝试系统字体
+        for font_name in chinese_fonts:
+            try:
+                font = pygame.font.SysFont(font_name, size)
+                # 测试是否能渲染中文
+                test_surface = font.render("测试", True, (255, 255, 255))
+                if test_surface.get_width() > 0:
+                    return font
+            except:
+                continue
+        
+        # 如果所有中文字体都失败，尝试默认字体
+        try:
+            return pygame.font.SysFont('arial', size)
+        except:
+            # 最后的备用选项
+            return pygame.font.Font(None, size)
 
     def reset_game(self):
         self.env.reset()

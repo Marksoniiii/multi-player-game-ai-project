@@ -5,5 +5,6 @@
 
 from .base_game import BaseGame
 from .base_env import BaseEnv
+from .pacman import PacmanGame, PacmanEnv
 
-__all__ = ['BaseGame', 'BaseEnv']
+__all__ = ['BaseGame', 'BaseEnv', 'PacmanGame', 'PacmanEnv']
