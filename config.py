@@ -32,6 +32,12 @@ GAME_CONFIGS = {
         'tiles_per_hand': 13,
         'timeout': 120,
         'max_rounds': 100,
+    },
+    'chess': {
+        'board_size': 8,
+        'timeout': 1800,  # 30分钟
+        'max_moves': 200,  # 最大回合数
+        'time_control': '30+0',  # 时间控制格式
     }
 }
 

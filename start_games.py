@@ -17,15 +17,17 @@ def main():
     print("1. 多游戏GUI - 五子棋和贪吃蛇 (推荐)")
     print("2. 贪吃蛇专用GUI - 更好的贪吃蛇体验")
     print("3. 吃豆人游戏 - 双人对战 (新增)")
-    print("4. 五子棋命令行版本")
-    print("5. 贪吃蛇命令行版本")
-    print("6. 运行测试")
-    print("7. 退出")
+    print("4. 国际象棋 - 玩家vs玩家对战 (最新)")
+    print("5. 成语猜多多 - 双人对战猜成语 (NEW!)")
+    print("6. 五子棋命令行版本")
+    print("7. 贪吃蛇命令行版本")
+    print("8. 运行测试")
+    print("9. 退出")
     print()
     
     while True:
         try:
-            choice = input("请输入选择 (1-7): ").strip()
+            choice = input("请输入选择 (1-9): ").strip()
             
             if choice == '1':
                 print("\n🎯 启动多游戏图形界面...")
@@ -61,46 +63,90 @@ def main():
                 break
                 
             elif choice == '3':
-                print("\n🟡 启动吃豆人游戏...")
+                print("\n🟡 启动吃豆人大战幽灵...")
                 print("特性:")
-                print("- 双人对战模式")
-                print("- 迷宫探索和豆子收集")
-                print("- 实时分数统计")
-                print("- 简单易懂的控制方式")
+                print("- 多种游戏模式选择")
+                print("- 玩家 vs 玩家 对战")
+                print("- 玩家 vs AI 智能对战")
+                print("- 角色选择 (吃豆人/幽灵)")
+                print("- 智能AI系统")
+                print("- 美观的图形界面")
                 print("控制说明:")
-                print("- 玩家1: W(上) A(左) S(下) D(右)")
-                print("- 玩家2: I(上) J(左) K(下) L(右)")
-                print("- 输入格式: 玩家1动作,玩家2动作")
+                print("- 吃豆人: W(上) A(左) S(下) D(右)")
+                print("- 幽灵: 方向键控制")
+                print("- 鼠标点击选择游戏模式")
                 print()
                 
                 if os.path.exists("pacman_gui.py"):
                     subprocess.run([sys.executable, "pacman_gui.py"])
                 else:
-                    # 运行命令行版本
-                    subprocess.run([sys.executable, "pacman_main.py"])
+                    print("❌ 吃豆人游戏文件未找到")
                 break
                 
             elif choice == '4':
+                print("\n♔ 启动国际象棋游戏...")
+                print("特性:")
+                print("- 完整的国际象棋规则实现")
+                print("- 支持所有特殊规则 (王车易位、吃过路兵、兵的升变)")
+                print("- 玩家vs玩家对战")
+                print("- 标准记谱法支持")
+                print("- 自然语言游戏状态描述")
+                print("- 为LLM AI集成预留接口")
+                print("控制说明:")
+                print("- 输入移动格式: e2e4 (从e2到e4)")
+                print("- 输入 'quit' 退出游戏")
+                print()
+                
+                if os.path.exists("chess_launcher.py"):
+                    subprocess.run([sys.executable, "chess_launcher.py"])
+                else:
+                    print("❌ 国际象棋游戏文件未找到")
+                break
+                
+            elif choice == '5':
+                print("\n🎯 启动成语猜多多...")
+                print("特性:")
+                print("- 双人对战猜成语游戏")
+                print("- 基于Gemini LLM智能出题")
+                print("- 3分钟限时挑战")
+                print("- 多种题目类型 (故事、典故、谜语等)")
+                print("- 智能答案判断和提示系统")
+                print("- 实时计分和计时")
+                print("游戏说明:")
+                print("- 每位玩家有独立的3分钟答题时间")
+                print("- 答对得1分，答错不扣分")
+                print("- 连续答错2次可获得额外提示")
+                print("- 计时结束后比较得分决定胜负")
+                print("注意: 需要设置有效的Gemini API密钥才能开始游戏")
+                print()
+                
+                if os.path.exists("idiom_guessing_gui.py"):
+                    subprocess.run([sys.executable, "idiom_guessing_gui.py"])
+                else:
+                    print("❌ 成语猜多多游戏文件未找到")
+                break
+                
+            elif choice == '6':
                 print("\n♟️  启动五子棋命令行版本...")
                 subprocess.run([sys.executable, "main.py", "--game", "gomoku", "--player1", "human", "--player2", "random"])
                 break
                 
-            elif choice == '5':
+            elif choice == '7':
                 print("\n🐍 启动贪吃蛇命令行版本...")
                 subprocess.run([sys.executable, "main.py", "--game", "snake", "--player1", "human", "--player2", "snake_ai"])
                 break
                 
-            elif choice == '6':
+            elif choice == '8':
                 print("\n🧪 运行项目测试...")
                 subprocess.run([sys.executable, "test_project.py"])
                 break
                 
-            elif choice == '7':
+            elif choice == '9':
                 print("\n👋 再见！")
                 sys.exit(0)
                 
             else:
-                print("❌ 无效选择，请输入 1-7")
+                print("❌ 无效选择，请输入 1-9")
                 
         except KeyboardInterrupt:
             print("\n\n👋 再见！")
