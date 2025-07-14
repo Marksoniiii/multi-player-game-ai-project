@@ -1,6 +1,6 @@
 """
 多游戏图形界面
-支持五子棋和贪吃蛇的人机对战，修复中文显示问题
+支持五子棋、贪吃蛇和乒乓球的人机对战，修复中文显示问题
 """
 
 import pygame
@@ -10,7 +10,9 @@ import os
 from typing import Optional, Tuple, Dict, Any
 from games.gomoku import GomokuGame, GomokuEnv
 from games.snake import SnakeGame, SnakeEnv
+from games.pong import PongEnv
 from agents import RandomBot, MinimaxBot, MCTSBot, HumanAgent, SnakeAI
+from agents.ai_bots.greedy_pong_ai import GreedyPongAI
 import config
 
 # 颜色定义
@@ -51,7 +53,7 @@ class MultiGameGUI:
         self.clock = pygame.time.Clock()
         
         # 游戏状态
-        self.current_game = "gomoku"  # "gomoku" 或 "snake"
+        self.current_game = "gomoku"  # "gomoku" 或 "snake" 或 "pong"
         self.env = None
         self.human_agent = None
         self.ai_agent = None
@@ -73,6 +75,10 @@ class MultiGameGUI:
         # 游戏计时
         self.last_update = time.time()
         self.update_interval = 0.3  # 贪吃蛇更新间隔
+        
+        # Pong游戏特有的属性
+        self.paddle_speed = 5
+        self.paddle_pos = self.window_height // 2
         
         self._switch_game("gomoku")
     
@@ -122,44 +128,44 @@ class MultiGameGUI:
             },
             # 先手选择（仅五子棋）
             'player_first': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 2 + 10, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 3 + 10, button_width, button_height),
                 'text': '玩家先手',
                 'color': COLORS['YELLOW']
             },
             'ai_first': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 3 + 10, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 4 + 10, button_width, button_height),
                 'text': 'AI先手',
                 'color': COLORS['LIGHT_GRAY']
             },
             # AI选择
             'random_ai': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 4 + 30, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 5 + 30, button_width, button_height),
                 'text': 'Random AI',
                 'color': COLORS['YELLOW']
             },
             'minimax_ai': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 5 + 30, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 6 + 30, button_width, button_height),
                 'text': 'Minimax AI',
                 'color': COLORS['LIGHT_GRAY']
             },
             'mcts_ai': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 6 + 30, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 7 + 30, button_width, button_height),
                 'text': 'MCTS AI',
                 'color': COLORS['LIGHT_GRAY']
             },
             # 控制按钮
             'new_game': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 7 + 60, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 8 + 60, button_width, button_height),
                 'text': 'New Game',
                 'color': COLORS['GREEN']
             },
             'pause': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 8 + 60, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 9 + 60, button_width, button_height),
                 'text': 'Pause',
                 'color': COLORS['ORANGE']
             },
             'quit': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 9 + 60, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 10 + 60, button_width, button_height),
                 'text': 'Quit',
                 'color': COLORS['RED']
             }
@@ -194,7 +200,13 @@ class MultiGameGUI:
             self.human_direction = (0, 1)
             self.human_agent = HumanAgent(name="Human Player", player_id=1)
             self.current_agent = self.human_agent  # 关键：切换到snake时设为玩家
-        
+        elif game_type == "pong":
+            self.env = PongEnv(window_width=self.window_width, window_height=self.window_height)
+            self.cell_size = 10 # Pong的cell_size较小
+            self.update_interval = 0.05 # Pong更新更快
+            self.human_agent = HumanAgent(name="Human Player", player_id=1)
+            self.ai_agent = GreedyPongAI(self.env.game, player_id=2)
+            self.current_agent = self.human_agent # Pong中玩家先手
         self._create_ai_agent()
         self.reset_game()
     
@@ -208,6 +220,8 @@ class MultiGameGUI:
             }
             ai_class = ai_map.get(self.selected_ai_name, SnakeAI)
             self.ai_agent = ai_class(name=self.selected_ai_name, player_id=2)
+        elif self.current_game == "pong":
+            self.ai_agent = GreedyPongAI(self.env.game, player_id=2)
         else:
             if self.selected_ai == "RandomBot":
                 self.ai_agent = RandomBot(name="Random AI", player_id=2)
@@ -232,7 +246,9 @@ class MultiGameGUI:
             else:
                 self.current_agent = self.ai_agent
                 self.thinking = True
-        else:
+        elif self.current_game == "snake":
+            self.current_agent = self.human_agent
+        elif self.current_game == "pong":
             self.current_agent = self.human_agent
         self.last_update = time.time()
         self.paused = False
@@ -245,11 +261,13 @@ class MultiGameGUI:
                 return False
             
             elif event.type == pygame.KEYDOWN:
-                # 处理贪吃蛇的键盘输入
-                if (self.current_game == "snake" and 
-                    isinstance(self.current_agent, HumanAgent) and 
-                    not self.game_over and not self.thinking and not self.paused):
-                    self._handle_snake_input(event.key)
+                # 处理贪吃蛇和Pong的键盘输入
+                if not self.game_over and not self.thinking and not self.paused:
+                    if self.current_game == "snake":
+                        if isinstance(self.current_agent, HumanAgent):
+                            self._handle_snake_input(event.key)
+                    elif self.current_game == "pong":
+                        self._handle_pong_input(event.key)
             
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # 左键点击
@@ -265,6 +283,17 @@ class MultiGameGUI:
                         isinstance(self.current_agent, HumanAgent) and 
                         not self.thinking and not self.paused):
                         self._handle_gomoku_click(mouse_pos)
+        
+        # 持续处理Pong的键盘输入
+        if self.current_game == "pong" and not self.game_over and not self.paused:
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_UP]:
+                self.paddle_pos = max(self.margin + 25, self.paddle_pos - self.paddle_speed)
+            if keys[pygame.K_DOWN]:
+                self.paddle_pos = min(self.window_height - self.margin - 25, self.paddle_pos + self.paddle_speed)
+            # 更新玩家挡板位置
+            if hasattr(self.env.game, 'update_paddle_position'):
+                self.env.game.update_paddle_position(self.paddle_pos)
         
         return True
     
@@ -348,6 +377,17 @@ class MultiGameGUI:
             if new_dir[0] != -self.env.game.direction1[0] or new_dir[1] != -self.env.game.direction1[1]:
                 self.human_direction = new_dir
     
+    def _handle_pong_input(self, key):
+        """处理Pong游戏键盘输入"""
+        if key == pygame.K_UP:
+            self.paddle_pos = max(self.margin + 25, self.paddle_pos - self.paddle_speed)
+        elif key == pygame.K_DOWN:
+            self.paddle_pos = min(self.window_height - self.margin - 25, self.paddle_pos + self.paddle_speed)
+        
+        # 更新玩家挡板位置
+        if hasattr(self.env.game, 'update_paddle_position'):
+            self.env.game.update_paddle_position(self.paddle_pos)
+    
     def _make_move(self, action):
         """执行移动"""
         if self.game_over or self.paused:
@@ -402,6 +442,19 @@ class MultiGameGUI:
                 if terminated or truncated:
                     self.game_over = True
                     self.winner = self.env.get_winner()
+        elif self.current_game == "pong":
+            if not self.game_over and not self.paused:
+                # Pong is a continuous game, no explicit turn switching here
+                # The GreedyAI will make its move based on the current state
+                try:
+                    ai_action = self.ai_agent.get_action(self.env.game.get_state(), self.env)
+                    self.env.step(ai_action) # Apply the action to the environment
+                except TypeError:
+                    ai_action = self.ai_agent.get_action(self.env.game.get_state())
+                    self.env.step(ai_action)
+                if self.env.game.game_over:
+                    self.game_over = True
+                    self.winner = self.env.game.winner
         else:
             # AI回合
             if (not isinstance(self.current_agent, HumanAgent) and self.thinking):
@@ -429,6 +482,8 @@ class MultiGameGUI:
             self._draw_gomoku()
         elif self.current_game == "snake":
             self._draw_snake()
+        elif self.current_game == "pong":
+            self._draw_pong()
         
         # 绘制UI
         self._draw_ui()
@@ -544,6 +599,35 @@ class MultiGameGUI:
                     elif board[row, col] == 5:  # 食物
                         pygame.draw.rect(self.screen, COLORS['GREEN'], rect)
     
+    def _draw_pong(self):
+        """绘制乒乓球"""
+        # 绘制游戏区域背景
+        game_rect = pygame.Rect(
+            self.margin, 
+            self.margin,
+            self.window_width - 2 * self.margin,
+            self.window_height - 2 * self.margin
+        )
+        pygame.draw.rect(self.screen, COLORS['LIGHT_GRAY'], game_rect)
+        pygame.draw.rect(self.screen, COLORS['BLACK'], game_rect, 2)
+
+        # 绘制球
+        ball_pos = self.env.game.ball_pos
+        ball_radius = self.env.game.ball_radius
+        pygame.draw.circle(self.screen, COLORS['BLACK'], ball_pos, ball_radius)
+
+        # 绘制挡板
+        paddle_left_pos = (self.margin, self.paddle_pos)
+        paddle_right_pos = (self.window_width - self.margin, self.paddle_pos)
+        paddle_width = 10
+        paddle_height = 50
+        pygame.draw.rect(self.screen, COLORS['BLUE'], pygame.Rect(paddle_left_pos[0], paddle_left_pos[1] - paddle_height // 2, paddle_width, paddle_height))
+        pygame.draw.rect(self.screen, COLORS['RED'], pygame.Rect(paddle_right_pos[0], paddle_right_pos[1] - paddle_height // 2, paddle_width, paddle_height))
+
+        # 绘制分数
+        score_text = self.font_medium.render(f"Player 1: {self.env.game.score1}  Player 2: {self.env.game.score2}", True, COLORS['BLACK'])
+        self.screen.blit(score_text, (self.window_width // 2 - score_text.get_width() // 2, self.margin - 30))
+    
     def _draw_ui(self):
         """绘制UI界面"""
         # 绘制按钮
@@ -573,12 +657,18 @@ class MultiGameGUI:
                 "• Click to place stone",
                 "• Connect 5 to win"
             ]
-        else:
+        elif self.current_game == "snake":
             instructions = [
                 "Snake Controls:",
                 "• Arrow keys/WASD to move",
                 "• Eat food to grow",
                 "• Avoid collision"
+            ]
+        elif self.current_game == "pong":
+            instructions = [
+                "Pong Controls:",
+                "• Arrow keys to move",
+                "• Avoid missing ball"
             ]
         # 说明起始Y坐标下移，使用self.button_height
         start_y = self.buttons['quit']['rect'].y + self.button_height + 18
@@ -608,8 +698,10 @@ class MultiGameGUI:
             if isinstance(self.current_agent, HumanAgent):
                 if self.current_game == "gomoku":
                     status_text = "Your Turn - Click to Place Stone"
-                else:
+                elif self.current_game == "snake":
                     status_text = "Your Turn - Use Arrow Keys"
+                elif self.current_game == "pong":
+                    status_text = "Use Arrow Keys to Move Paddle"
                 color = COLORS['BLUE']
             else:
                 if self.thinking:
@@ -626,7 +718,7 @@ class MultiGameGUI:
         info_y = status_y + 40
         if self.current_game == "gomoku":
             player_info = f"Black: Human Player  White: {self.ai_agent.name if self.ai_agent else 'AI'}"
-        else:
+        elif self.current_game == "snake":
             if hasattr(self.env.game, 'snake1') and hasattr(self.env.game, 'snake2'):
                 len1 = len(self.env.game.snake1) if self.env.game.alive1 else 0
                 len2 = len(self.env.game.snake2) if self.env.game.alive2 else 0
@@ -635,6 +727,13 @@ class MultiGameGUI:
                 player_info = f"Blue Snake(You): {len1} segments({alive1})  Red Snake(AI): {len2} segments({alive2})"
             else:
                 player_info = "Snake Battle in Progress..."
+        elif self.current_game == "pong":
+            if hasattr(self.env.game, 'score'):
+                score1 = self.env.game.score[1]
+                score2 = self.env.game.score[2]
+                player_info = f"Player: {score1}  AI: {score2}"
+            else:
+                player_info = "Pong Game in Progress..."
         
         info_surface = self.font_small.render(player_info, True, COLORS['DARK_GRAY'])
         self.screen.blit(info_surface, (status_x, info_y))

@@ -16,18 +16,19 @@ def main():
     print("请选择游戏模式:")
     print("1. 多游戏GUI - 五子棋和贪吃蛇 (推荐)")
     print("2. 贪吃蛇专用GUI - 更好的贪吃蛇体验")
-    print("3. 吃豆人游戏 - 双人对战 (新增)")
-    print("4. 国际象棋 - 玩家vs玩家对战 (最新)")
-    print("5. 成语猜多多 - 双人对战猜成语 (NEW!)")
-    print("6. 五子棋命令行版本")
-    print("7. 贪吃蛇命令行版本")
-    print("8. 运行测试")
-    print("9. 退出")
+    print("3. 乒乓球 Pong - 玩家 vs AI 或 双人")
+    print("4. 吃豆人游戏 - 双人对战 (新增)")
+    print("5. 国际象棋 - 玩家vs玩家对战 (最新)")
+    print("6. 成语猜多多 - 双人对战猜成语 (NEW!)")
+    print("7. 五子棋命令行版本")
+    print("8. 贪吃蛇命令行版本")
+    print("9. 运行测试")
+    print("10. 退出")
     print()
     
     while True:
         try:
-            choice = input("请输入选择 (1-9): ").strip()
+            choice = input("请输入选择 (1-10): ").strip()
             
             if choice == '1':
                 print("\n🎯 启动多游戏图形界面...")
@@ -63,6 +64,24 @@ def main():
                 break
                 
             elif choice == '3':
+                print("\n🏓 启动乒乓球 Pong ...")
+                print("特性:")
+                print("- 玩家 vs 玩家 / 玩家 vs AI")
+                print("- 贪婪 AI 或手动控制")
+                print("- 漂亮的像素 UI 与倒计时")
+                print("控制说明:")
+                print("- 玩家1: W(上) / S(下)")
+                print("- 玩家2: ↑(上) / ↓(下) 或 AI 自动")
+                print()
+                # Pong GUI 路径
+                pong_path = os.path.join("games", "pong", "pong_gui.py")
+                if os.path.exists(pong_path):
+                    subprocess.run([sys.executable, pong_path])
+                else:
+                    print("❌ Pong GUI 文件未找到")
+                break
+                
+            elif choice == '4':
                 print("\n🟡 启动吃豆人大战幽灵...")
                 print("特性:")
                 print("- 多种游戏模式选择")
@@ -83,7 +102,7 @@ def main():
                     print("❌ 吃豆人游戏文件未找到")
                 break
                 
-            elif choice == '4':
+            elif choice == '5':
                 print("\n♔ 启动国际象棋游戏...")
                 print("特性:")
                 print("- 完整的国际象棋规则实现")
@@ -103,7 +122,7 @@ def main():
                     print("❌ 国际象棋游戏文件未找到")
                 break
                 
-            elif choice == '5':
+            elif choice == '6':
                 print("\n🎯 启动成语猜多多...")
                 print("特性:")
                 print("- 双人对战猜成语游戏")
@@ -126,27 +145,27 @@ def main():
                     print("❌ 成语猜多多游戏文件未找到")
                 break
                 
-            elif choice == '6':
+            elif choice == '7':
                 print("\n♟️  启动五子棋命令行版本...")
                 subprocess.run([sys.executable, "main.py", "--game", "gomoku", "--player1", "human", "--player2", "random"])
                 break
                 
-            elif choice == '7':
+            elif choice == '8':
                 print("\n🐍 启动贪吃蛇命令行版本...")
                 subprocess.run([sys.executable, "main.py", "--game", "snake", "--player1", "human", "--player2", "snake_ai"])
                 break
                 
-            elif choice == '8':
+            elif choice == '9':
                 print("\n🧪 运行项目测试...")
                 subprocess.run([sys.executable, "test_project.py"])
                 break
                 
-            elif choice == '9':
+            elif choice == '10':
                 print("\n👋 再见！")
                 sys.exit(0)
                 
             else:
-                print("❌ 无效选择，请输入 1-9")
+                print("❌ 无效选择，请输入 1-10")
                 
         except KeyboardInterrupt:
             print("\n\n👋 再见！")
