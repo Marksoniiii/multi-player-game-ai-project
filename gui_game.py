@@ -275,7 +275,8 @@ class MultiGameGUI:
                 if button_name == 'new_game':
                     self.reset_game()
                 elif button_name == 'quit':
-                    return True
+                    pygame.quit()
+                    sys.exit()
                 elif button_name == 'pause':
                     self.paused = not self.paused
                     self.buttons['pause']['text'] = 'Resume' if self.paused else 'Pause'
