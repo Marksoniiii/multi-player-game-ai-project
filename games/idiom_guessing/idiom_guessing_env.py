@@ -1,161 +1,212 @@
-import numpy as np
-from typing import Dict, List, Tuple, Any, Optional
-import gym
-from gym import spaces
+#!/usr/bin/env python3
+"""
+成语猜多多游戏环境
+"""
 
-from ..base_env import BaseEnv
-from .idiom_guessing_game import IdiomGuessingGame, GameState
+import time
+import numpy as np
+from typing import Dict, List, Any, Optional, Tuple
+
+from games.base_env import BaseEnv
+from games.idiom_guessing.idiom_guessing_game import IdiomGuessingGame
 
 
 class IdiomGuessingEnv(BaseEnv):
     """成语猜多多游戏环境"""
     
-    def __init__(self, llm_bot=None):
-        self.game = IdiomGuessingGame()
-        self.llm_bot = llm_bot
-        if llm_bot:
-            self.game.set_llm_bot(llm_bot)
-        
-        # 调用父类构造函数
+    def __init__(self, time_limit: float = 180):
+        self.game = IdiomGuessingGame(time_limit=time_limit)
         super().__init__(self.game)
         
-        self.reset()
-    
     def _setup_spaces(self) -> None:
         """设置观察空间和动作空间"""
-        # 动作空间：字符串（成语答案）
-        self.action_space = spaces.Discrete(1)  # 这里简化为离散空间
+        # 观察空间：文本描述，这里用字典表示
+        self.observation_space = "text"
         
-        # 观察空间：游戏状态字典
-        self.observation_space = spaces.Dict({
-            'game_state': spaces.Discrete(4),  # 游戏状态
-            'current_player': spaces.Discrete(2),  # 当前玩家
-            'scores': spaces.Box(low=0, high=100, shape=(2,), dtype=np.int32),  # 分数
-            'time_remaining': spaces.Box(low=0, high=180, shape=(2,), dtype=np.float32),  # 剩余时间
-            'question': spaces.Text(max_length=200),  # 当前问题
-        })
+        # 动作空间：文本回答，这里用字符串表示
+        self.action_space = "text"
+    
+    def _get_observation(self) -> Dict[str, Any]:
+        """获取观察"""
+        game_info = self.game.get_game_info()
+        return {
+            "type": "observation",
+            "game_info": game_info,
+            "current_question": game_info.get("current_question", ""),
+            "current_player": game_info.get("current_player", ""),
+            "remaining_time": game_info.get("remaining_time", 0),
+            "correct_count": game_info.get("correct_count", 0),
+            "wrong_count": game_info.get("wrong_count", 0),
+            "hint_count": game_info.get("hint_count", 0),
+            "max_hints": game_info.get("max_hints", 2),
+            "is_running": game_info.get("is_running", False),
+            "is_time_up": game_info.get("is_time_up", False)
+        }
     
     def _get_action_mask(self) -> np.ndarray:
         """获取动作掩码"""
-        # 对于成语猜多多游戏，所有动作都是有效的（文本输入）
+        # 文本游戏不需要动作掩码
         return np.array([1])
     
-    def reset(self) -> Dict[str, Any]:
+    def reset(self) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """重置环境"""
-        if hasattr(self.game, 'reset_game'):
-            self.game.reset_game()
-        else:
-            self.game.reset()
-        return self.get_detailed_observation()
+        self.game.reset()
+        observation = self._get_observation()
+        info = self.game.get_game_info()
+        return observation, info
     
-    def step(self, action: str) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any]]:
+    def step(self, action: str) -> Tuple[Dict[str, Any], float, bool, bool, Dict[str, Any]]:
         """执行动作"""
-        # action 是玩家提交的答案
-        result = self.game.submit_answer(action)
+        if not isinstance(action, str):
+            return self._get_observation(), -1, True, False, {'error': 'Action must be a string'}
         
-        observation = self.get_detailed_observation()
-        reward = 1.0 if result.get('correct', False) else 0.0
-        done = self.game.state == GameState.GAME_OVER
-        info = result
+        # 处理不同类型的动作
+        if action.startswith("answer:"):
+            # 提交答案
+            answer = action[7:].strip()
+            result = self.game.submit_answer(answer)
+            reward = 1 if result.get("correct", False) else -0.1
+            done = result.get("game_over", False)
+            
+        elif action.startswith("hint"):
+            # 请求提示
+            result = self.game.get_hint()
+            reward = -0.05  # 使用提示的小惩罚
+            done = False
+            
+        elif action.startswith("next_player"):
+            # 切换到下一个玩家
+            result = self.game.next_player()
+            reward = 0
+            done = result.get("game_over", False)
+            
+        elif action.startswith("generate_question"):
+            # 生成新问题
+            result = self.game.generate_question()
+            reward = 0
+            done = False
+            
+        else:
+            # 默认当作答案处理
+            result = self.game.submit_answer(action)
+            reward = 1 if result.get("correct", False) else -0.1
+            done = result.get("game_over", False)
         
-        return observation, reward, done, info
-    
-    def render(self, mode='human'):
-        """渲染游戏状态"""
-        state = self.game.get_game_state()
+        # 获取新观察
+        observation = self._get_observation()
         
-        if mode == 'human':
-            print(f"=== 成语猜多多游戏 ===")
-            print(f"游戏状态: {state['state']}")
-            print(f"当前玩家: {state['current_player']}")
-            print(f"玩家1 ({state['player1']['name']}): {state['player1']['score']}分 | 剩余时间: {state['player1']['time_remaining']:.1f}秒")
-            print(f"玩家2 ({state['player2']['name']}): {state['player2']['score']}分 | 剩余时间: {state['player2']['time_remaining']:.1f}秒")
-            if state['current_question']:
-                print(f"当前问题: {state['current_question']}")
-            print("=" * 30)
+        # 检查是否超时
+        truncated = observation.get("is_time_up", False)
+        if truncated:
+            done = True
         
-        return state
-    
-    def close(self):
-        """关闭环境"""
-        self.game.stop_game()
-    
-    def seed(self, seed=None):
-        """设置随机种子"""
-        np.random.seed(seed)
-        return [seed]
-    
-    def _get_observation(self) -> np.ndarray:
-        """获取观察"""
-        state = self.game.get_game_state()
-        
-        # 将游戏状态转换为数值
-        state_mapping = {
-            'waiting': 0,
-            'player1_turn': 1,
-            'player2_turn': 2,
-            'game_over': 3
+        # 合并结果信息
+        info = {
+            "action_result": result,
+            "game_info": self.game.get_game_info()
         }
         
-        # 返回简化的观察（用于兼容父类）
-        return np.array([
-            state_mapping.get(state['state'], 0),
-            0 if state['player1']['is_active'] else 1,
-            state['player1']['score'],
-            state['player2']['score'],
-            state['player1']['time_remaining'],
-            state['player2']['time_remaining']
-        ])
+        return observation, reward, done, truncated, info
     
-    def get_detailed_observation(self) -> Dict[str, Any]:
-        """获取详细观察（用于GUI显示）"""
-        state = self.game.get_game_state()
-        
-        # 将游戏状态转换为数值
-        state_mapping = {
-            'waiting': 0,
-            'player1_turn': 1,
-            'player2_turn': 2,
-            'game_over': 3
-        }
-        
-        return {
-            'game_state': state_mapping.get(state['state'], 0),
-            'current_player': 0 if state['player1']['is_active'] else 1,
-            'scores': np.array([state['player1']['score'], state['player2']['score']], dtype=np.int32),
-            'time_remaining': np.array([state['player1']['time_remaining'], state['player2']['time_remaining']], dtype=np.float32),
-            'question': state['current_question'],
-            'player1_name': state['player1']['name'],
-            'player2_name': state['player2']['name'],
-            'raw_state': state  # 保留原始状态用于GUI显示
-        }
-    
-    def start_game(self, player1_name: str = "玩家1", player2_name: str = "玩家2"):
+    def start_game(self, mode: str = "single", players: List[str] = None):
         """开始游戏"""
-        self.game.start_game(player1_name, player2_name)
+        if players is None:
+            players = ["Player1"]
+        
+        self.game.set_game_mode(mode, players)
+        self.game.start_game()
+        
+        # 生成第一个问题
+        self.game.generate_question()
+        
         return self._get_observation()
     
+    def get_current_question(self) -> str:
+        """获取当前问题"""
+        return self.game.current_question
+    
+    def get_current_player(self) -> Optional[str]:
+        """获取当前玩家"""
+        return self.game.get_current_player()
+    
+    def get_game_statistics(self) -> Dict[str, Any]:
+        """获取游戏统计"""
+        return self.game.get_game_statistics()
+    
+    def is_game_over(self) -> bool:
+        """检查游戏是否结束"""
+        return not self.game.is_running
+    
+    def get_winner(self) -> Optional[str]:
+        """获取获胜者"""
+        return self.game.winner
+    
+    def render(self, mode: str = "human") -> None:
+        """渲染游戏状态"""
+        if mode == "human":
+            self._render_human()
+        elif mode == "ansi":
+            return self._render_ansi()
+    
+    def _render_human(self) -> None:
+        """人类可读的渲染"""
+        game_info = self.game.get_game_info()
+        current_player = game_info.get("current_player", "")
+        
+        print("\n" + "="*50)
+        print("🎯 成语猜多多")
+        print("="*50)
+        
+        if current_player:
+            print(f"当前玩家: {current_player}")
+        
+        print(f"游戏模式: {'双人对战' if self.game.game_mode == 'pvp' else '单人模式'}")
+        print(f"时间限制: {self.game.time_limit}秒")
+        
+        if game_info.get("is_running", False):
+            print(f"剩余时间: {game_info.get('remaining_time', 0):.1f}秒")
+            print(f"已答对: {game_info.get('correct_count', 0)}题")
+            print(f"已答错: {game_info.get('wrong_count', 0)}题")
+            print(f"已用提示: {game_info.get('hint_count', 0)}/{game_info.get('max_hints', 2)}")
+            
+            if game_info.get("current_question"):
+                print(f"\n题目: {game_info['current_question']}")
+                print("\n请输入你的答案:")
+            else:
+                print("\n等待生成题目...")
+        else:
+            print("游戏未开始")
+        
+        print("="*50)
+    
+    def _render_ansi(self) -> str:
+        """ANSI格式渲染"""
+        game_info = self.game.get_game_info()
+        
+        output = []
+        output.append("成语猜多多游戏状态")
+        output.append(f"当前玩家: {game_info.get('current_player', '')}")
+        output.append(f"剩余时间: {game_info.get('remaining_time', 0):.1f}秒")
+        output.append(f"得分: {game_info.get('correct_count', 0)}")
+        output.append(f"题目: {game_info.get('current_question', '')}")
+        
+        return "\n".join(output)
+    
     def get_valid_actions(self) -> List[str]:
-        """获取有效动作（这里返回空列表，因为动作是文本输入）"""
-        return []
+        """获取有效动作"""
+        if not self.game.is_running:
+            return ["generate_question"]
+        
+        actions = ["answer:"]  # 答案前缀
+        
+        if self.game.hint_count < self.game.max_hints:
+            actions.append("hint")
+        
+        if self.game.game_mode == "pvp":
+            actions.append("next_player")
+        
+        return actions
     
-    def submit_answer(self, answer: str) -> Dict[str, Any]:
-        """提交答案的便捷方法"""
-        return self.game.submit_answer(answer)
-    
-    def set_callback(self, event_type: str, callback):
-        """设置事件回调"""
-        self.game.set_callback(event_type, callback)
-    
-    def get_game_state(self) -> Dict[str, Any]:
-        """获取游戏状态"""
-        return self.game.get_game_state()
-    
-    def switch_player(self):
-        """切换玩家"""
-        self.game.switch_player()
-    
-    def set_llm_bot(self, llm_bot):
-        """设置LLM机器人"""
-        self.llm_bot = llm_bot
-        self.game.set_llm_bot(llm_bot) 
+    def close(self) -> None:
+        """关闭环境"""
+        pass 

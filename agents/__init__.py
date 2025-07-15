@@ -14,7 +14,7 @@ from .ai_bots.snake_ai import SnakeAI
 from .ai_bots.llm_chess_assistant import LLMChessAssistant
 from .ai_bots.enhanced_chess_ai import EnhancedChessAI
 from .ai_bots.stockfish_chess_ai import StockfishChessAI
-from .ai_bots.gemini_idiom_bot import GeminiIdiomBot
+from .ai_bots.llm_idiom_bot import LLMIdiomBot
 
 __all__ = [
     'BaseAgent',
@@ -28,5 +28,5 @@ __all__ = [
     'LLMChessAssistant',
     'EnhancedChessAI',
     'StockfishChessAI',
-    'GeminiIdiomBot'
+    'LLMIdiomBot'
 ]

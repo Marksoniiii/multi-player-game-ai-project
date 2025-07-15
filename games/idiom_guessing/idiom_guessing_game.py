@@ -1,358 +1,636 @@
+#!/usr/bin/env python3
+"""
+成语猜多多游戏类
+"""
+
 import time
-import threading
-from typing import Dict, List, Tuple, Optional, Any
+import random
+from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
-from enum import Enum
 
-from ..base_game import BaseGame
-
-
-class GameState(Enum):
-    WAITING = "waiting"
-    PLAYER1_TURN = "player1_turn"
-    PLAYER2_TURN = "player2_turn"
-    GAME_OVER = "game_over"
+from games.base_game import BaseGame
+from utils.llm_manager import llm_manager
 
 
 @dataclass
-class PlayerStats:
-    name: str
-    score: int = 0
-    time_remaining: float = 180.0  # 3分钟 = 180秒
-    current_question: str = ""
-    current_answer: str = ""
-    is_active: bool = False
-    wrong_count: int = 0  # 当前题目错误次数
-
-
-@dataclass
-class GameResult:
-    winner: str
-    player1_score: int
-    player2_score: int
-    game_duration: float
+class GameStats:
+    """游戏统计"""
+    correct_count: int = 0
+    wrong_count: int = 0
+    total_attempts: int = 0
+    start_time: float = 0
+    end_time: float = 0
+    time_limit: float = 180  # 3分钟
+    
+    @property
+    def elapsed_time(self) -> float:
+        """已用时间"""
+        if self.end_time > 0:
+            return self.end_time - self.start_time
+        return time.time() - self.start_time
+    
+    @property
+    def remaining_time(self) -> float:
+        """剩余时间"""
+        return max(0, self.time_limit - self.elapsed_time)
+    
+    @property
+    def is_time_up(self) -> bool:
+        """是否超时"""
+        return self.remaining_time <= 0
 
 
 class IdiomGuessingGame(BaseGame):
-    """成语猜多多游戏核心逻辑"""
+    """成语猜多多游戏"""
     
-    def __init__(self):
-        # 初始化游戏特有的属性
-        self.state = GameState.WAITING
-        self.player1 = PlayerStats("玩家1")
-        self.player2 = PlayerStats("玩家2")
-        self.current_player_obj = None  # 避免与BaseGame的current_player冲突
-        self.game_start_time = None
-        self.timer_thread = None
-        self.timer_running = False
-        self.llm_bot = None  # LLM出题机器人
-        self.game_callbacks = {}  # 用于GUI更新的回调函数
+    def __init__(self, time_limit: float = 180):
+        # 创建游戏配置
+        game_config = {
+            'timeout': time_limit,
+            'max_moves': 1000  # 最大问题数
+        }
         
-        # 调用父类构造函数
-        super().__init__()
+        # 初始化游戏特有属性
+        self.time_limit = time_limit
+        self.game_mode = "single"  # single or pvp
+        self.players = []
+        self.current_player_index = 0
+        self.current_question = ""
+        self.current_answer = ""
+        self.current_question_id = 0
+        self.hint_count = 0
+        self.max_hints = 2
         
-    def set_llm_bot(self, llm_bot):
-        """设置LLM机器人"""
-        self.llm_bot = llm_bot
+        # 玩家统计
+        self.player_stats = {}
         
-    def set_callback(self, event_type: str, callback):
-        """设置事件回调函数"""
-        self.game_callbacks[event_type] = callback
+        # 游戏状态
+        self.is_running = False
+        self.winner = None
+        self.game_result = None
+        
+        # 题目历史
+        self.question_history = []
+        
+        # 调用基类构造函数
+        super().__init__(game_config)
+        
+    def set_game_mode(self, mode: str, players: List[str]):
+        """设置游戏模式"""
+        self.game_mode = mode
+        self.players = players
+        self.current_player_index = 0
+        
+        # 初始化玩家统计
+        self.player_stats = {}
+        for player in players:
+            self.player_stats[player] = GameStats(
+                start_time=time.time(),
+                time_limit=self.time_limit
+            )
     
-    def start_game(self, player1_name: str = "玩家1", player2_name: str = "玩家2"):
+    def start_game(self):
         """开始游戏"""
-        if self.llm_bot is None:
-            raise ValueError("必须设置LLM机器人才能开始游戏")
+        self.is_running = True
+        self.winner = None
+        self.game_result = None
+        self.question_history = []
+        
+        # 重置当前玩家统计
+        current_player = self.get_current_player()
+        if current_player:
+            self.player_stats[current_player].start_time = time.time()
+            self.player_stats[current_player].end_time = 0
+    
+    def get_current_player(self) -> Optional[str]:
+        """获取当前玩家"""
+        if self.players and 0 <= self.current_player_index < len(self.players):
+            return self.players[self.current_player_index]
+        return None
+    
+    def get_current_stats(self) -> Optional[GameStats]:
+        """获取当前玩家统计"""
+        current_player = self.get_current_player()
+        if current_player:
+            return self.player_stats[current_player]
+        return None
+    
+    def generate_question(self) -> Dict[str, Any]:
+        """生成新问题"""
+        try:
+            # 构建出题提示词
+            prompt = self._build_question_prompt()
             
-        self.player1.name = player1_name
-        self.player2.name = player2_name
-        self.game_start_time = time.time()
-        self.state = GameState.PLAYER1_TURN
-        self.current_player_obj = self.player1
-        self.current_player_obj.is_active = True
-        self.current_player = 1  # 设置BaseGame的current_player
-        
-        # 开始计时
-        self._start_timer()
-        
-        # 请求第一个问题
-        self._request_new_question()
-        
-        self._trigger_callback('game_started', {
-            'player1': self.player1.name,
-            'player2': self.player2.name,
-            'current_player': self.current_player_obj.name
-        })
+            # 调用LLM生成问题
+            response = llm_manager.generate_text(prompt)
+            
+            # 解析响应
+            question_data = self._parse_question_response(response)
+            
+            self.current_question = question_data["question"]
+            self.current_answer = question_data["answer"]
+            self.current_question_id += 1
+            self.hint_count = 0
+            
+            # 记录问题历史
+            self.question_history.append({
+                "id": self.current_question_id,
+                "question": self.current_question,
+                "answer": self.current_answer,
+                "player": self.get_current_player(),
+                "timestamp": time.time()
+            })
+            
+            return question_data
+            
+        except Exception as e:
+            print(f"生成问题失败: {e}")
+            # 降级到默认问题
+            return self._get_fallback_question()
     
     def submit_answer(self, answer: str) -> Dict[str, Any]:
         """提交答案"""
-        if self.state == GameState.GAME_OVER:
-            return {'success': False, 'message': '游戏已结束'}
+        if not self.is_running:
+            return {"error": "游戏未开始"}
         
-        if not self.current_player_obj.is_active:
-            return {'success': False, 'message': '当前不是您的回合'}
+        current_stats = self.get_current_stats()
+        if not current_stats:
+            return {"error": "无效的玩家"}
         
-        self.current_player_obj.current_answer = answer
+        # 检查是否超时
+        if current_stats.is_time_up:
+            return self._handle_timeout()
         
-        # 请求LLM判断答案
-        result = self._check_answer_with_llm(answer)
+        # 更新尝试次数
+        current_stats.total_attempts += 1
         
-        response = {
-            'success': True,
-            'correct': result['correct'],
-            'message': result['message'],
-            'score': self.current_player_obj.score,
-            'time_remaining': self.current_player_obj.time_remaining
-        }
+        # 判断答案
+        result = self._judge_answer(answer)
         
-        if result['correct']:
-            self.current_player_obj.score += 1
-            self.current_player_obj.wrong_count = 0
-            # 请求新问题
-            self._request_new_question()
+        # 更新统计
+        if result["correct"]:
+            current_stats.correct_count += 1
         else:
-            self.current_player_obj.wrong_count += 1
-            # 如果错误次数达到2次，提供额外提示
-            if self.current_player_obj.wrong_count >= 2:
-                hint = self._request_hint()
-                response['hint'] = hint
+            current_stats.wrong_count += 1
         
-        self._trigger_callback('answer_submitted', response)
-        return response
-    
-    def switch_player(self):
-        """切换到下一个玩家"""
-        if self.state == GameState.PLAYER1_TURN:
-            self.player1.is_active = False
-            self.player2.is_active = True
-            self.current_player_obj = self.player2
-            self.current_player = 2  # 设置BaseGame的current_player
-            self.state = GameState.PLAYER2_TURN
-            self.current_player_obj.time_remaining = 180.0  # 重置时间
-        elif self.state == GameState.PLAYER2_TURN:
-            self._end_game()
-            return
-        
-        # 重新开始计时
-        self._start_timer()
-        self._request_new_question()
-        
-        self._trigger_callback('player_switched', {
-            'current_player': self.current_player_obj.name,
-            'player1_score': self.player1.score,
-            'player2_score': self.player2.score
-        })
-    
-    def get_game_state(self) -> Dict[str, Any]:
-        """获取当前游戏状态"""
-        return {
-            'state': self.state.value,
-            'player1': {
-                'name': self.player1.name,
-                'score': self.player1.score,
-                'time_remaining': self.player1.time_remaining,
-                'is_active': self.player1.is_active
-            },
-            'player2': {
-                'name': self.player2.name,
-                'score': self.player2.score,
-                'time_remaining': self.player2.time_remaining,
-                'is_active': self.player2.is_active
-            },
-            'current_question': self.current_player_obj.current_question if self.current_player_obj else "",
-            'current_player': self.current_player_obj.name if self.current_player_obj else ""
-        }
-    
-    def _start_timer(self):
-        """开始计时"""
-        # 停止当前计时器
-        if self.timer_thread and self.timer_thread.is_alive():
-            self.timer_running = False
-            # 检查是否是当前线程，避免join自己
-            if self.timer_thread != threading.current_thread():
-                self.timer_thread.join()
-        
-        self.timer_running = True
-        self.timer_thread = threading.Thread(target=self._timer_loop)
-        self.timer_thread.daemon = True
-        self.timer_thread.start()
-    
-    def _timer_loop(self):
-        """计时器循环"""
-        while self.timer_running and self.current_player_obj.time_remaining > 0:
-            time.sleep(0.1)
-            if self.timer_running:
-                self.current_player_obj.time_remaining -= 0.1
-                # 每秒更新一次UI
-                if int(self.current_player_obj.time_remaining * 10) % 10 == 0:
-                    self._trigger_callback('time_update', {
-                        'time_remaining': self.current_player_obj.time_remaining,
-                        'player': self.current_player_obj.name
-                    })
-        
-        if self.current_player_obj.time_remaining <= 0:
-            self._on_time_up()
-    
-    def _on_time_up(self):
-        """时间结束"""
-        self.timer_running = False
-        self.current_player_obj.time_remaining = 0
-        
-        # 通过回调通知GUI处理时间到事件，让GUI决定是否切换玩家
-        self._trigger_callback('time_up', {
-            'player': self.current_player_obj.name,
-            'score': self.current_player_obj.score,
-            'should_switch': True  # 提示需要切换玩家
-        })
-    
-    def _request_new_question(self):
-        """请求新问题"""
-        if self.llm_bot:
-            try:
-                question = self.llm_bot.generate_question()
-                self.current_player_obj.current_question = question
-                self.current_player_obj.wrong_count = 0
-                
-                self._trigger_callback('new_question', {
-                    'question': question,
-                    'player': self.current_player_obj.name
-                })
-            except Exception as e:
-                self._trigger_callback('error', {'message': f'获取问题失败: {str(e)}'})
-    
-    def _check_answer_with_llm(self, answer: str) -> Dict[str, Any]:
-        """使用LLM检查答案"""
-        if self.llm_bot:
-            try:
-                result = self.llm_bot.check_answer(
-                    self.current_player_obj.current_question, 
-                    answer
-                )
-                return result
-            except Exception as e:
-                return {
-                    'correct': False,
-                    'message': f'答案检查失败: {str(e)}'
-                }
-        return {'correct': False, 'message': 'LLM机器人未设置'}
-    
-    def _request_hint(self) -> str:
-        """请求提示"""
-        if self.llm_bot:
-            try:
-                return self.llm_bot.get_hint(self.current_player_obj.current_question)
-            except Exception as e:
-                return f'获取提示失败: {str(e)}'
-        return '提示功能不可用'
-    
-    def _end_game(self):
-        """结束游戏"""
-        self.timer_running = False
-        self.state = GameState.GAME_OVER
-        
-        # 确定获胜者
-        if self.player1.score > self.player2.score:
-            winner = self.player1.name
-        elif self.player2.score > self.player1.score:
-            winner = self.player2.name
-        else:
-            winner = "平局"
-        
-        result = GameResult(
-            winner=winner,
-            player1_score=self.player1.score,
-            player2_score=self.player2.score,
-            game_duration=time.time() - self.game_start_time
-        )
-        
-        self._trigger_callback('game_ended', {
-            'winner': winner,
-            'player1_score': self.player1.score,
-            'player2_score': self.player2.score,
-            'game_duration': result.game_duration
-        })
+        # 检查游戏结束条件
+        if current_stats.is_time_up:
+            result.update(self._handle_timeout())
         
         return result
     
-    def _trigger_callback(self, event_type: str, data: Dict[str, Any]):
-        """触发回调函数"""
-        if event_type in self.game_callbacks:
-            try:
-                self.game_callbacks[event_type](data)
-            except Exception as e:
-                print(f"回调函数错误 ({event_type}): {e}")
-    
-    def stop_game(self):
-        """停止游戏"""
-        self.timer_running = False
-        if self.timer_thread and self.timer_thread.is_alive():
-            # 检查是否是当前线程，避免join自己
-            if self.timer_thread != threading.current_thread():
-                self.timer_thread.join()
-        self.state = GameState.GAME_OVER
+    def get_hint(self) -> Dict[str, Any]:
+        """获取提示"""
+        if self.hint_count >= self.max_hints:
+            return {"error": "提示次数已用完"}
         
-    def reset_game(self):
-        """重置游戏"""
-        self.stop_game()
-        self.player1 = PlayerStats("玩家1")
-        self.player2 = PlayerStats("玩家2")
-        self.current_player_obj = None
-        self.current_player = 1  # 重置BaseGame的current_player
-        self.state = GameState.WAITING
-        self.game_start_time = None
+        try:
+            # 构建提示提示词
+            prompt = self._build_hint_prompt()
+            
+            # 调用LLM生成提示
+            hint_text = llm_manager.generate_text(prompt)
+            
+            self.hint_count += 1
+            
+            return {
+                "hint": hint_text,
+                "remaining_hints": self.max_hints - self.hint_count
+            }
+            
+        except Exception as e:
+            print(f"生成提示失败: {e}")
+            return {"error": "提示生成失败"}
     
-    # 实现BaseGame的抽象方法
-    def reset(self) -> Dict[str, Any]:
-        """重置游戏状态"""
-        self.reset_game()
-        return self.get_state()
+    def next_player(self) -> Dict[str, Any]:
+        """切换到下一个玩家"""
+        if self.game_mode == "single":
+            return {"error": "单人模式无法切换玩家"}
+        
+        # 结束当前玩家的游戏
+        current_stats = self.get_current_stats()
+        if current_stats:
+            current_stats.end_time = time.time()
+        
+        # 切换到下一个玩家
+        self.current_player_index += 1
+        
+        if self.current_player_index >= len(self.players):
+            # 所有玩家都完成了，结束游戏
+            return self._end_game()
+        else:
+            # 开始下一个玩家的游戏
+            self.start_game()
+            return {
+                "current_player": self.get_current_player(),
+                "message": f"轮到{self.get_current_player()}了！"
+            }
+    
+    def _build_question_prompt(self) -> str:
+        """构建出题提示词"""
+        prompt = f"""你是一个成语猜谜游戏的出题者。请为玩家出一道成语题。
+
+要求：
+1. 选择一个常见的四字成语
+2. 用多样化的方式描述这个成语的含义，但不要直接说出成语本身
+3. 描述方式可以是：典故、情景、反义词、字面解释、谜语等
+4. 描述要准确但不要太简单或太难
+5. 请按照以下格式回复：
+
+成语：[四字成语]
+描述：[对成语的描述]
+
+现在请出题："""
+        
+        return prompt
+    
+    def _parse_question_response(self, response: str) -> Dict[str, Any]:
+        """解析问题响应"""
+        try:
+            lines = response.strip().split('\n')
+            answer = ""
+            question = ""
+            
+            for line in lines:
+                line = line.strip()
+                if line.startswith("成语："):
+                    answer = line.replace("成语：", "").strip()
+                elif line.startswith("描述："):
+                    question = line.replace("描述：", "").strip()
+            
+            if not answer or not question:
+                # 尝试其他解析方式
+                if "：" in response:
+                    parts = response.split("：")
+                    if len(parts) >= 2:
+                        answer = parts[1].split('\n')[0].strip()
+                        question = response.split("描述：")[-1].strip() if "描述：" in response else parts[0].strip()
+            
+            if not answer or not question:
+                raise ValueError("无法解析LLM响应")
+            
+            return {
+                "question": question,
+                "answer": answer,
+                "question_id": self.current_question_id + 1
+            }
+            
+        except Exception as e:
+            print(f"解析问题失败: {e}")
+            return self._get_fallback_question()
+    
+    def _get_fallback_question(self) -> Dict[str, Any]:
+        """获取备用问题"""
+        fallback_questions = [
+            {"question": "这个成语比喻做了多余的事情，反而坏了事。来自古代一个画蛇比赛的故事。", "answer": "画蛇添足"},
+            {"question": "这个成语比喻死守陈规，不知变通。讲的是一个人守着树等兔子的故事。", "answer": "守株待兔"},
+            {"question": "这个成语比喻出了问题后想办法补救。讲的是羊丢了再修羊圈的故事。", "answer": "亡羊补牢"},
+            {"question": "这个成语比喻观念陈旧，不知变通。讲的是在船上找掉到水里的剑的故事。", "answer": "刻舟求剑"},
+        ]
+        
+        selected = random.choice(fallback_questions)
+        return {
+            "question": selected["question"],
+            "answer": selected["answer"],
+            "question_id": self.current_question_id + 1
+        }
+    
+    def _judge_answer(self, answer: str) -> Dict[str, Any]:
+        """判断答案"""
+        try:
+            # 构建判断提示词
+            prompt = self._build_judge_prompt(answer)
+            
+            # 调用LLM判断
+            response = llm_manager.generate_text(prompt)
+            
+            # 解析判断结果
+            is_correct = self._parse_judge_response(response, answer)
+            
+            result = {
+                "correct": is_correct,
+                "user_answer": answer,
+                "correct_answer": self.current_answer,
+                "response": response
+            }
+            
+            if is_correct:
+                result["message"] = f"恭喜你，回答正确！正确答案是'{self.current_answer}'。"
+                # 自动生成下一题
+                next_question = self.generate_question()
+                result["next_question"] = next_question
+            else:
+                result["message"] = f"很遗憾，回答错误。'{answer}'不是正确答案。"
+                if self.hint_count < self.max_hints:
+                    result["hint_available"] = True
+            
+            return result
+            
+        except Exception as e:
+            print(f"判断答案失败: {e}")
+            # 降级到简单比较
+            return self._simple_judge(answer)
+    
+    def _build_judge_prompt(self, answer: str) -> str:
+        """构建判断提示词"""
+        prompt = f"""你是一个成语猜谜游戏的判断者。
+
+题目：{self.current_question}
+正确答案：{self.current_answer}
+用户答案：{answer}
+
+请判断用户的答案是否正确。考虑以下情况：
+1. 完全匹配正确答案
+2. 意思相同但表达略有不同
+3. 同义成语
+4. 错别字但意思明确
+
+请用以下格式回复：
+判断：[正确/错误]
+说明：[简短解释]
+
+现在请判断："""
+        
+        return prompt
+    
+    def _parse_judge_response(self, response: str, answer: str) -> bool:
+        """解析判断响应"""
+        try:
+            # 检查响应中的关键词
+            if "正确" in response:
+                return True
+            elif "错误" in response:
+                return False
+            else:
+                # 降级到简单比较
+                return self._simple_compare(answer)
+                
+        except Exception as e:
+            print(f"解析判断失败: {e}")
+            return self._simple_compare(answer)
+    
+    def _simple_judge(self, answer: str) -> Dict[str, Any]:
+        """简单判断"""
+        is_correct = self._simple_compare(answer)
+        
+        result = {
+            "correct": is_correct,
+            "user_answer": answer,
+            "correct_answer": self.current_answer
+        }
+        
+        if is_correct:
+            result["message"] = f"恭喜你，回答正确！正确答案是'{self.current_answer}'。"
+            # 自动生成下一题
+            next_question = self.generate_question()
+            result["next_question"] = next_question
+        else:
+            result["message"] = f"很遗憾，回答错误。'{answer}'不是正确答案。"
+            if self.hint_count < self.max_hints:
+                result["hint_available"] = True
+        
+        return result
+    
+    def _simple_compare(self, answer: str) -> bool:
+        """简单比较答案"""
+        # 去除空格和标点
+        clean_answer = answer.replace(" ", "").replace("，", "").replace("。", "").replace("！", "")
+        clean_correct = self.current_answer.replace(" ", "").replace("，", "").replace("。", "").replace("！", "")
+        
+        return clean_answer == clean_correct
+    
+    def _build_hint_prompt(self) -> str:
+        """构建提示提示词"""
+        prompt = f"""你是一个成语猜谜游戏的提示者。
+
+题目：{self.current_question}
+正确答案：{self.current_answer}
+这是第{self.hint_count + 1}次提示（最多{self.max_hints}次）
+
+请给出一个有用的提示，帮助玩家猜出答案，但不要直接说出答案。
+提示可以是：
+1. 关键字的含义
+2. 成语的结构特点
+3. 相关的同义词或反义词
+4. 更具体的使用场景
+
+请用简短的一句话给出提示："""
+        
+        return prompt
+    
+    def _handle_timeout(self) -> Dict[str, Any]:
+        """处理超时"""
+        current_stats = self.get_current_stats()
+        if current_stats:
+            current_stats.end_time = time.time()
+        
+        if self.game_mode == "single":
+            self.is_running = False
+            return {
+                "game_over": True,
+                "reason": "timeout",
+                "message": "时间到！游戏结束。",
+                "final_score": current_stats.correct_count if current_stats else 0
+            }
+        else:
+            return self.next_player()
+    
+    def _end_game(self) -> Dict[str, Any]:
+        """结束游戏"""
+        self.is_running = False
+        
+        # 计算最终结果
+        scores = {}
+        for player, stats in self.player_stats.items():
+            scores[player] = stats.correct_count
+        
+        # 找到获胜者
+        if scores:
+            max_score = max(scores.values())
+            winners = [player for player, score in scores.items() if score == max_score]
+            
+            if len(winners) == 1:
+                self.winner = winners[0]
+                result_message = f"恭喜{self.winner}获胜！"
+            else:
+                result_message = f"平局！{', '.join(winners)}并列第一。"
+        else:
+            result_message = "游戏结束。"
+        
+        return {
+            "game_over": True,
+            "reason": "completed",
+            "message": result_message,
+            "scores": scores,
+            "winner": self.winner,
+            "statistics": self.get_game_statistics()
+        }
+    
+    def get_game_statistics(self) -> Dict[str, Any]:
+        """获取游戏统计信息"""
+        stats = {}
+        for player, player_stats in self.player_stats.items():
+            stats[player] = {
+                "correct_count": player_stats.correct_count,
+                "wrong_count": player_stats.wrong_count,
+                "total_attempts": player_stats.total_attempts,
+                "accuracy": player_stats.correct_count / max(1, player_stats.total_attempts),
+                "time_used": player_stats.elapsed_time,
+                "avg_time_per_question": player_stats.elapsed_time / max(1, player_stats.correct_count)
+            }
+        
+        return stats
+    
+    def get_game_info(self) -> Dict[str, Any]:
+        """获取游戏信息"""
+        current_stats = self.get_current_stats()
+        current_player = self.get_current_player()
+        
+        info = {
+            "game_mode": self.game_mode,
+            "current_player": current_player,
+            "is_running": self.is_running,
+            "current_question": self.current_question,
+            "current_question_id": self.current_question_id,
+            "hint_count": self.hint_count,
+            "max_hints": self.max_hints,
+            "time_limit": self.time_limit,
+            "question_history_count": len(self.question_history)
+        }
+        
+        if current_stats:
+            info.update({
+                "correct_count": current_stats.correct_count,
+                "wrong_count": current_stats.wrong_count,
+                "total_attempts": current_stats.total_attempts,
+                "elapsed_time": current_stats.elapsed_time,
+                "remaining_time": current_stats.remaining_time,
+                "is_time_up": current_stats.is_time_up
+            })
+        
+        return info
+    
+    def reset(self):
+        """重置游戏"""
+        self.current_player_index = 0
+        self.current_question = ""
+        self.current_answer = ""
+        self.current_question_id = 0
+        self.hint_count = 0
+        self.is_running = False
+        self.winner = None
+        self.game_result = None
+        self.question_history = []
+        self.player_stats = {}
+        
+        # 重新初始化玩家统计
+        for player in self.players:
+            self.player_stats[player] = GameStats(time_limit=self.time_limit)
+        
+        # 调用父类reset
+        self.move_count = 0
+        self.history = []
+        self.current_player = 1
+        self.game_state = "ongoing"
+        self.start_time = time.time()
+        self.last_move_time = time.time()
+        
+        return self.get_game_info()
     
     def step(self, action: Any) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any]]:
         """执行一步动作"""
         if isinstance(action, str):
-            result = self.submit_answer(action)
-            observation = self.get_state()
-            reward = 1.0 if result.get('correct', False) else 0.0
-            done = self.is_terminal()
-            info = result
-            return observation, reward, done, info
-        else:
-            return self.get_state(), 0.0, False, {'error': 'Invalid action type'}
+            if action.startswith("answer:"):
+                answer = action[7:].strip()
+                result = self.submit_answer(answer)
+                reward = 1.0 if result.get("correct", False) else -0.1
+                done = result.get("game_over", False)
+                observation = self.get_state()
+                info = {"action_result": result}
+                return observation, reward, done, info
+            elif action == "hint":
+                result = self.get_hint()
+                reward = -0.05
+                done = False
+                observation = self.get_state()
+                info = {"action_result": result}
+                return observation, reward, done, info
+            elif action == "next_player":
+                result = self.next_player()
+                reward = 0.0
+                done = result.get("game_over", False)
+                observation = self.get_state()
+                info = {"action_result": result}
+                return observation, reward, done, info
+            elif action == "generate_question":
+                result = self.generate_question()
+                reward = 0.0
+                done = False
+                observation = self.get_state()
+                info = {"action_result": result}
+                return observation, reward, done, info
+        
+        # 默认处理
+        return self.get_state(), 0.0, False, {"error": "Invalid action"}
     
     def get_valid_actions(self, player: int = None) -> List[Any]:
         """获取有效动作列表"""
-        # 对于成语猜多多游戏，有效动作是任意字符串（成语答案）
-        return ["任意字符串"]  # 这里返回一个占位符，实际上任何字符串都是有效的
+        if not self.is_running:
+            return ["generate_question"]
+        
+        actions = ["answer:", "hint"]
+        if self.game_mode == "pvp":
+            actions.append("next_player")
+        
+        return actions
     
     def is_terminal(self) -> bool:
         """检查游戏是否结束"""
-        return self.state == GameState.GAME_OVER
+        return not self.is_running
     
     def get_winner(self) -> Optional[int]:
         """获取获胜者"""
-        if not self.is_terminal():
-            return None
+        if self.game_mode == "single":
+            return 1 if self.is_running else None
         
-        if self.player1.score > self.player2.score:
-            return 1
-        elif self.player2.score > self.player1.score:
-            return 2
-        else:
-            return None  # 平局
+        if self.winner and len(self.players) >= 2:
+            try:
+                winner_index = self.players.index(self.winner)
+                return winner_index + 1
+            except ValueError:
+                return None
+        
+        return None
     
     def get_state(self) -> Dict[str, Any]:
         """获取当前游戏状态"""
-        return self.get_game_state()
+        return self.get_game_info()
     
-    def render(self) -> Any:
+    def render(self) -> str:
         """渲染游戏画面"""
-        state = self.get_game_state()
-        print(f"=== 成语猜多多游戏 ===")
-        print(f"游戏状态: {state['state']}")
-        print(f"当前玩家: {state['current_player']}")
-        print(f"玩家1 ({state['player1']['name']}): {state['player1']['score']}分")
-        print(f"玩家2 ({state['player2']['name']}): {state['player2']['score']}分")
-        if state['current_question']:
-            print(f"当前问题: {state['current_question']}")
-        print("=" * 30)
-        return state 
+        game_info = self.get_game_info()
+        output = []
+        output.append("=" * 50)
+        output.append("🎯 成语猜多多")
+        output.append("=" * 50)
+        
+        if game_info.get("current_player"):
+            output.append(f"当前玩家: {game_info['current_player']}")
+        
+        output.append(f"游戏模式: {'双人对战' if self.game_mode == 'pvp' else '单人模式'}")
+        
+        if game_info.get("is_running", False):
+            output.append(f"剩余时间: {game_info.get('remaining_time', 0):.1f}秒")
+            output.append(f"已答对: {game_info.get('correct_count', 0)}题")
+            output.append(f"已答错: {game_info.get('wrong_count', 0)}题")
+            
+            if game_info.get("current_question"):
+                output.append("")
+                output.append(f"题目: {game_info['current_question']}")
+            else:
+                output.append("等待生成题目...")
+        else:
+            output.append("游戏未开始")
+        
+        output.append("=" * 50)
+        return "\n".join(output) 

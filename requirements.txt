@@ -8,4 +8,3 @@ tk>=0.1.0
 python-chess>=1.999
 stockfish>=3.28.0
 requests>=2.25.0
-google-generativeai>=0.3.0
