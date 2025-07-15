@@ -56,7 +56,7 @@ class GeminiClient(BaseLLMClient):
             if not self.config.api_key or self.config.api_key == "dummy_key":
                 raise Exception("请配置有效的Gemini API密钥")
             
-            url = f"{self.base_url}/gemini-2.5-flash:generateContent"
+            url = f"{self.base_url}/gemini-2.0-flash:generateContent"
             headers = {
                 "Content-Type": "application/json",
                 "x-goog-api-key": self.config.api_key
@@ -127,63 +127,115 @@ class GeminiClient(BaseLLMClient):
 
 
 class QianwenClient(BaseLLMClient):
-    """阿里千问客户端"""
+    """阿里千问客户端 - 支持多轮对话"""
     
     def __init__(self, config: LLMConfig):
         super().__init__(config)
-        self.base_url = config.base_url or "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
+        self.base_url = config.base_url or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        self.messages = []  # 存储对话历史
+        
+    def set_system_message(self, system_content: str):
+        """设置系统消息"""
+        self.messages = [{"role": "system", "content": system_content}]
+        
+    def add_user_message(self, content: str):
+        """添加用户消息"""
+        self.messages.append({"role": "user", "content": content})
+        
+    def add_assistant_message(self, content: str):
+        """添加助手消息"""
+        self.messages.append({"role": "assistant", "content": content})
+        
+    def clear_history(self):
+        """清空对话历史（保留系统消息）"""
+        system_msg = None
+        for msg in self.messages:
+            if msg["role"] == "system":
+                system_msg = msg
+                break
+        self.messages = [system_msg] if system_msg else []
+        
+    def get_conversation_history(self):
+        """获取对话历史"""
+        return self.messages.copy()
         
     def generate_text(self, prompt: str, **kwargs) -> str:
-        """调用千问API生成文本"""
+        """调用千问API生成文本 - 支持多轮对话"""
         try:
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.config.api_key}"
             }
-            
-            # 增加随机性参数
+
+            # 如果没有对话历史，使用单轮对话模式
+            if not self.messages:
+                messages = [
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt}
+                ]
+            else:
+                # 多轮对话模式：将当前prompt添加到对话历史
+                messages = self.messages.copy()
+                messages.append({"role": "user", "content": prompt})
+
             data = {
-                "model": self.config.model_name or "qwen-max",
-                "input": {
-                    "messages": [
-                        {"role": "user", "content": prompt}
-                    ]
-                },
-                "parameters": {
-                    "max_tokens": kwargs.get("max_tokens", self.config.max_tokens),
-                    "temperature": kwargs.get("temperature", 0.9),  # 增加随机性
-                    "top_p": kwargs.get("top_p", 0.95),  # 增加多样性
-                    "top_k": kwargs.get("top_k", 30),   # 降低top_k增加随机性
-                    "repetition_penalty": kwargs.get("repetition_penalty", 1.5),  # 进一步增加重复惩罚
-                    "enable_search": False,
-                    "incremental_output": False,
-                    "do_sample": True,  # 确保采样模式
-                    "seed": kwargs.get("seed", random.randint(1, 1000000))  # 随机种子
-                }
+                "model": self.config.model_name or "qwen-plus",
+                "messages": messages,
+                "max_tokens": kwargs.get("max_tokens", self.config.max_tokens),
+                "temperature": kwargs.get("temperature", self.config.temperature),
+                "top_p": kwargs.get("top_p", 0.95),
+                "stream": False
             }
-            
+
+            # 构建完整的URL
+            url = f"{self.base_url}/chat/completions"
+
             response = requests.post(
-                self.base_url,
+                url,
                 headers=headers,
                 json=data,
                 timeout=self.config.timeout
             )
-            
+
             if response.status_code == 200:
                 result = response.json()
-                if "output" in result and "text" in result["output"]:
-                    return result["output"]["text"]
+                if "choices" in result and len(result["choices"]) > 0:
+                    choice = result["choices"][0]
+                    if "message" in choice and "content" in choice["message"]:
+                        response_content = choice["message"]["content"]
+                        
+                        # 如果使用多轮对话模式，自动更新对话历史
+                        if self.messages:
+                            self.messages.append({"role": "user", "content": prompt})
+                            self.messages.append({"role": "assistant", "content": response_content})
+                        
+                        return response_content
+                    else:
+                        raise Exception(f"响应格式错误: {choice}")
                 else:
-                    raise Exception("API返回格式错误")
+                    raise Exception(f"API返回格式错误: {result}")
             else:
-                raise Exception(f"API调用失败: {response.status_code}, {response.text}")
-                
+                error_msg = f"API调用失败: {response.status_code}"
+                if response.status_code == 401:
+                    error_msg += " - API密钥无效"
+                elif response.status_code == 403:
+                    error_msg += " - 权限不足或配额耗尽"
+                elif response.status_code == 429:
+                    error_msg += " - 请求过于频繁"
+                else:
+                    error_msg += f" - {response.text}"
+                raise Exception(error_msg)
+
+        except requests.exceptions.Timeout:
+            raise Exception("请求超时，请检查API设置或增加超时时间")
         except Exception as e:
             raise Exception(f"千问API调用失败: {str(e)}")
     
     def is_available(self) -> bool:
         """检查千问是否可用"""
         try:
+            if not self.config.api_key or self.config.api_key == "dummy_key":
+                return False
             test_response = self.generate_text("测试", max_tokens=10)
             return len(test_response) > 0
         except:
@@ -325,17 +377,17 @@ class LLMManager:
         try:
             # 为千问设置更高的温度以增加随机性
             default_temperature = 0.9 if model_type == "qianwen" else 0.7
-            
+
             config = LLMConfig(
                 model_type=model_type,
                 api_key=api_key,
                 base_url=kwargs.get("base_url", ""),
-                model_name=kwargs.get("model_name", ""),
-                max_tokens=kwargs.get("max_tokens", 2000),
+                model_name=kwargs.get("model_name", "qwen-plus"),  # 默认使用 "qwen-plus" 模型
+                max_tokens=kwargs.get("max_tokens", 2000),  # 使用较大的 max_tokens
                 temperature=kwargs.get("temperature", default_temperature),
                 timeout=kwargs.get("timeout", 30)
             )
-            
+
             # 创建客户端
             if model_type == "gemini":
                 client = GeminiClient(config)
@@ -345,23 +397,24 @@ class LLMManager:
                 client = SimulatorClient(config)
             else:
                 raise ValueError(f"不支持的模型类型: {model_type}")
-            
+
             # 检查模型是否可用
             if model_type != "simulator" and not client.is_available():
                 print(f"警告：{model_type} 模型不可用，可能是API密钥无效或网络问题")
                 return False
-            
+
             self.clients[model_type] = client
-            
+
             # 如果是第一个配置的模型，自动设置为当前模型
             if self.current_client is None and model_type != "simulator":
                 self.current_client = client
-            
+
             return True
-            
+
         except Exception as e:
             print(f"配置模型失败: {str(e)}")
             return False
+
     
     def set_current_model(self, model_type: str) -> bool:
         """设置当前使用的模型"""

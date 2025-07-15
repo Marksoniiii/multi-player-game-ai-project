@@ -12,7 +12,7 @@ from utils.llm_manager import llm_manager
 
 
 class LLMIdiomBot(BaseAgent):
-    """LLM成语出题机器人"""
+    """LLM成语出题机器人 - 支持多轮对话"""
     
     def __init__(self, name: str = "LLM出题官", player_id: int = 0):
         super().__init__(name, player_id)
@@ -42,6 +42,62 @@ class LLMIdiomBot(BaseAgent):
         self.wrong_judgments = 0
         self.hints_provided = 0
         
+        # 初始化多轮对话
+        self._initialize_conversation()
+        
+    def _initialize_conversation(self):
+        """初始化多轮对话"""
+        # 获取当前客户端并设置系统消息（仅千问支持多轮对话）
+        try:
+            current_client = llm_manager.current_client
+            if (current_client and 
+                current_client.__class__.__name__ == 'QianwenClient'):
+                system_message = """你是一个专业的成语猜谜游戏出题官。你需要根据历史对话中已经使用过的成语，每次出一道全新的成语题，绝对不能重复使用任何成语。
+
+你的职责：
+1. 根据要求出成语题，每次都要选择不同的成语
+2. 记住之前所有出过的成语，绝对不能重复
+3. 判断用户答案是否正确
+4. 提供合适的提示
+5. 保持题目的趣味性和挑战性
+
+出题格式要求：
+成语：[四字成语]
+描述：[对成语的生动描述]
+
+请始终遵循这个格式，确保每次出题都使用不同的成语。"""
+                # 使用 getattr 安全调用方法
+                set_system_message = getattr(current_client, 'set_system_message', None)
+                if set_system_message:
+                    set_system_message(system_message)
+        except Exception as e:
+            print(f"初始化多轮对话失败: {e}")
+    
+    def reset_conversation(self):
+        """重置对话历史但保留系统消息"""
+        try:
+            current_client = llm_manager.current_client
+            if (current_client and 
+                current_client.__class__.__name__ == 'QianwenClient'):
+                # 使用 getattr 安全调用方法
+                clear_history = getattr(current_client, 'clear_history', None)
+                if clear_history:
+                    clear_history()
+                    self._initialize_conversation()
+        except Exception as e:
+            print(f"重置对话失败: {e}")
+    
+    def clear_all_history(self):
+        """完全重置所有历史记录"""
+        self.used_idioms.clear()
+        self.question_history.clear()
+        self.hint_history.clear()
+        self.questions_generated = 0
+        self.correct_judgments = 0
+        self.wrong_judgments = 0
+        self.hints_provided = 0
+        self.reset_conversation()
+        
     def get_action(self, observation: Any, env: Any) -> Any:
         """获取动作（对于出题机器人，这个方法不直接使用）"""
         return None
@@ -60,15 +116,21 @@ class LLMIdiomBot(BaseAgent):
                 # 构建提示词，包含已使用的成语列表
                 prompt = self._build_question_prompt(question_type, difficulty)
                 
-                # 调用LLM生成题目，增加随机性
+                # 构建简化的多轮对话提示词
+                difficulty_desc = {
+                    "easy": "简单常见",
+                    "medium": "中等难度", 
+                    "hard": "较难"
+                }.get(difficulty, "中等难度")
+                
+                simplified_prompt = f"请为我出第{self.questions_generated + 1}道成语题，要求与之前所有题目的成语都不相同，选择{difficulty_desc}的成语。"
+                
+                # 调用LLM生成题目，使用多轮对话
                 response = llm_manager.generate_text(
-                    prompt, 
+                    simplified_prompt, 
                     temperature=0.95,  # 增加随机性
                     max_tokens=500,
-                    seed=random.randint(1, 1000000),  # 随机种子
-                    top_p=0.95,
-                    top_k=20,  # 降低top_k增加随机性
-                    repetition_penalty=1.6  # 增加重复惩罚
+                    top_p=0.95
                 )
                 
                 # 解析响应
