@@ -262,42 +262,38 @@ class PacmanGame(BaseGame):
     
     def is_terminal(self) -> bool:
         """检查游戏是否结束"""
-        # 所有豆子被收集完
-        if self.dots_remaining <= 0:
+        # 吃豆人吃掉60%及以上豆子
+        total_dots = self.dots_count
+        collected = total_dots - self.dots_remaining
+        if collected / total_dots >= 0.6:
             return True
-        
         # 达到最大移动次数
         if self.move_count >= self.game_config.get('max_moves', 2000):
             return True
-        
         # 玩家碰撞
         if self._check_collision():
             return True
-        
         return False
-    
+
     def get_winner(self) -> Optional[int]:
         """获取获胜者 - 吃豆人 vs 幽灵规则"""
         if not self.is_terminal():
             return None
-        
         # 如果发生碰撞，幽灵获胜
         if self._check_collision():
             return 2  # 幽灵抓到吃豆人
-        
-        # 如果所有豆子被收集完，吃豆人获胜
-        if self.dots_remaining <= 0:
-            return 1  # 吃豆人完成任务
-        
+        # 如果吃豆人吃掉60%及以上豆子，吃豆人获胜
+        total_dots = self.dots_count
+        collected = total_dots - self.dots_remaining
+        if collected / total_dots >= 0.6:
+            return 1  # 吃豆人胜利
         # 如果时间到了，根据收集的豆子比例判断
         if self.move_count >= self.game_config.get('max_moves', 2000):
-            total_dots = self.dots_count
-            collected_ratio = (total_dots - self.dots_remaining) / total_dots
-            if collected_ratio >= 0.8:  # 收集了80%以上的豆子
-                return 1  # 吃豆人获胜
+            collected_ratio = collected / total_dots
+            if collected_ratio >= 0.6:
+                return 1  # 吃豆人胜利
             else:
-                return 2  # 幽灵获胜
-        
+                return 2  # 幽灵胜利
         return None  # 其他情况平局
     
     def get_state(self) -> Dict[str, Any]:

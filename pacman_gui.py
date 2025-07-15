@@ -44,10 +44,10 @@ class PacmanGUI:
         # 颜色定义
         self.colors = {
             'background': (0, 0, 0),        # 黑色背景
-            'wall': (0, 0, 255),            # 蓝色墙壁
-            'dot': (255, 255, 0),           # 黄色豆子
-            'empty': (0, 0, 0),             # 黑色空地
-            'player1': (255, 255, 0),       # 经典黄色吃豆人
+            'wall': (0, 0, 0),            # 黑色墙壁
+            'dot': (139, 69, 19),           # 棕色豆子
+            'empty': (255, 255, 255),       # 白色通道
+            'player1': (0, 255, 0),         # 绿色吃豆人
             'player2': (255, 50, 50),       # 红色幽灵
             'ghost_eyes': (255, 255, 255),  # 幽灵眼睛
             'text': (220, 220, 220),        # 柔和白色文字
@@ -383,77 +383,87 @@ class PacmanGUI:
         pygame.draw.circle(self.screen, (0, 0, 0), right_eye, 1)
     
     def draw_info_panel(self, info: Dict[str, Any]):
-        """绘制信息面板"""
+        """绘制信息面板（标题居中，内容左对齐，分隔线加粗，行距加大）"""
         panel_x = self.board_width + 10
-        panel_y = 10
+        panel_y = 20  # 顶部留更大空隙
         panel_width = self.info_panel_width - 20
-        panel_height = 200  # 减小高度，为控制说明留出更多空间
-        
-        # 绘制背景
-        panel_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
-        pygame.draw.rect(self.screen, self.colors['info_bg'], panel_rect)
-        pygame.draw.rect(self.screen, self.colors['border'], panel_rect, 2)
-        
-        # 绘制标题
-        title_text = self.title_font.render("游戏信息", True, self.colors['title_text'])
-        self.screen.blit(title_text, (panel_x + 15, panel_y + 10))
-        
-        # 绘制游戏信息
-        y_offset = 45
+        padding = 18  # 左右内边距
+        line_gap = 28  # 行间距
+        # 计算内容高度
         info_texts = [
             f"步数: {self.step_count}",
             f"吃豆人分数: {info.get('player1_score', 0)}",
             f"剩余豆子: {info.get('dots_remaining', 0)}",
+            f"吃豆进度: {((self.dots_count-info.get('dots_remaining',0))/self.dots_count*100) if self.dots_count>0 else 0:.1f}%",
             "",
             "当前动作:",
             f"吃豆人: {self.last_actions.get(1, 'stay')}",
             f"幽灵: {self.last_actions.get(2, 'stay')}"
         ]
-        
+        panel_height = 60 + len(info_texts) * line_gap
+        # 绘制背景
+        panel_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
+        pygame.draw.rect(self.screen, self.colors['info_bg'], panel_rect)
+        pygame.draw.rect(self.screen, self.colors['border'], panel_rect, 3)
+        # 居中标题
+        title_text = self.title_font.render("游戏信息", True, self.colors['title_text'])
+        title_rect = title_text.get_rect(center=(panel_x + panel_width//2, panel_y + 24))
+        self.screen.blit(title_text, title_rect)
+        # 内容
+        y_offset = panel_y + 54
         for text in info_texts:
-            if text:  # 跳过空行
+            if text:
                 text_surface = self.font.render(text, True, self.colors['text'])
-                self.screen.blit(text_surface, (panel_x + 15, panel_y + y_offset))
-            y_offset += 22  # 减小行间距
+                self.screen.blit(text_surface, (panel_x + padding, y_offset))
+            y_offset += line_gap
+        # 分隔线
+        sep_y = y_offset + 6
+        pygame.draw.line(self.screen, self.colors['border'], (panel_x, sep_y), (panel_x+panel_width, sep_y), 4)
+        self._next_panel_y = sep_y + 16  # 记录下一个面板的起始y
     
     def draw_controls(self):
-        """绘制控制说明"""
+        """绘制控制说明（标题居中，内容左对齐，行距更紧凑，字体更小，面板自适应高度）"""
         panel_x = self.board_width + 10
-        panel_y = 230  # 固定位置，紧接在信息面板下方
+        panel_y = getattr(self, '_next_panel_y', 260)  # 紧接上一个面板
         panel_width = self.info_panel_width - 20
-        panel_height = self.board_height - 240  # 使用剩余高度
-        
-        # 绘制背景
-        control_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
-        pygame.draw.rect(self.screen, self.colors['info_bg'], control_rect)
-        pygame.draw.rect(self.screen, self.colors['border'], control_rect, 2)
-        
-        # 绘制标题
-        title_text = self.title_font.render("控制说明", True, self.colors['title_text'])
-        self.screen.blit(title_text, (panel_x + 15, panel_y + 10))
-        
-        # 绘制控制说明
-        y_offset = 40
+        padding = 18
+        line_gap = 14  # 进一步缩小行间距
+        # 游戏规则简介
+        rule_texts = [
+            "游戏规则:",
+            "吃豆人吃够60%豆子即可获胜",
+            "被幽灵抓到则失败",
+            ""
+        ]
         control_texts = [
-            "吃豆人 (黄色):",
+            "吃豆人 (绿色):",
             "W - 向上",
             "S - 向下", 
             "A - 向左",
             "D - 向右",
-            "",
             "幽灵 (红色):",
             "↑ - 向上",
             "↓ - 向下",
             "← - 向左",
             "→ - 向右"
         ]
-        
-        for text in control_texts:
-            if text:  # 跳过空行
-                # 使用较小字体显示控制说明
-                text_surface = self.small_font.render(text, True, self.colors['text'])
-                self.screen.blit(text_surface, (panel_x + 15, panel_y + y_offset))
-            y_offset += 18  # 减小行间距
+        all_texts = rule_texts + control_texts
+        panel_height = 54 + len(all_texts) * line_gap
+        # 背景
+        control_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
+        pygame.draw.rect(self.screen, self.colors['info_bg'], control_rect)
+        pygame.draw.rect(self.screen, self.colors['border'], control_rect, 3)
+        # 居中标题
+        title_text = self.title_font.render("控制说明", True, self.colors['title_text'])
+        title_rect = title_text.get_rect(center=(panel_x + panel_width//2, panel_y + 24))
+        self.screen.blit(title_text, title_rect)
+        # 内容
+        y_offset = panel_y + 54
+        for text in all_texts:
+            if text:
+                text_surface = self.font.render(text, True, self.colors['text'])
+                self.screen.blit(text_surface, (panel_x + padding, y_offset))
+            y_offset += line_gap
     
     def show_game_over(self, info: Dict[str, Any]):
         """显示游戏结束画面"""
@@ -828,110 +838,75 @@ class PacmanAIGUI(PacmanGUI):
     def draw_controls(self):
         """绘制控制说明 - AI模式"""
         panel_x = self.board_width + 10
-        panel_y = 230  # 固定位置，紧接在信息面板下方
+        panel_y = getattr(self, '_next_panel_y', 260)  # 紧接上一个面板
         panel_width = self.info_panel_width - 20
-        panel_height = self.board_height - 240  # 使用剩余高度
-        
-        # 绘制背景
+        padding = 18
+        line_gap = 24
+        # 游戏规则简介
+        rule_texts = [
+            "游戏规则:",
+            "吃豆人吃够60%豆子即可获胜",
+            "被幽灵抓到则失败",
+            ""
+        ]
+        control_texts = [
+            "吃豆人 (绿色):",
+            "WSAD - 上下左右",
+            "幽灵 (红色):",
+            "↑↓←→ - 上下左右"
+        ]
+        all_texts = rule_texts + control_texts
+        panel_height = 54 + len(all_texts) * line_gap
+        # 背景
         control_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
         pygame.draw.rect(self.screen, self.colors['info_bg'], control_rect)
-        pygame.draw.rect(self.screen, self.colors['border'], control_rect, 2)
-        
-        # 绘制标题
+        pygame.draw.rect(self.screen, self.colors['border'], control_rect, 3)
+        # 居中标题
         title_text = self.title_font.render("控制说明", True, self.colors['title_text'])
-        self.screen.blit(title_text, (panel_x + 15, panel_y + 10))
-        
-        # 绘制控制说明
-        y_offset = 40
-        
-        ai_type = "高级AI" if self.ai_level == 'advanced' else "基础AI"
-        
-        if self.player_role == 'pacman':
-            # 玩家控制吃豆人
-            ai_desc = "智能路径规划追逐" if self.ai_level == 'advanced' else "简单追逐吃豆人"
-            control_texts = [
-                "玩家 (黄色吃豆人):",
-                "W - 向上",
-                "S - 向下", 
-                "A - 向左",
-                "D - 向右",
-                "",
-                f"{ai_type} (红色幽灵):",
-                ai_desc
-            ]
-        else:
-            # 玩家控制幽灵
-            ai_desc = "智能收集豆子+避险" if self.ai_level == 'advanced' else "简单收集豆子"
-            control_texts = [
-                f"{ai_type} (黄色吃豆人):",
-                ai_desc,
-                "自动避开幽灵",
-                "",
-                "玩家 (红色幽灵):",
-                "↑ - 向上",
-                "↓ - 向下",
-                "← - 向左",
-                "→ - 向右"
-            ]
-        
-        for text in control_texts:
-            if text:  # 跳过空行
-                # 使用较小字体显示控制说明
+        title_rect = title_text.get_rect(center=(panel_x + panel_width//2, panel_y + 24))
+        self.screen.blit(title_text, title_rect)
+        # 内容
+        y_offset = panel_y + 54
+        for text in all_texts:
+            if text:
                 text_surface = self.small_font.render(text, True, self.colors['text'])
-                self.screen.blit(text_surface, (panel_x + 15, panel_y + y_offset))
-            y_offset += 18  # 减小行间距
+                self.screen.blit(text_surface, (panel_x + padding, y_offset))
+            y_offset += line_gap
     
     def draw_info_panel(self, info):
         """绘制信息面板 - AI模式"""
         panel_x = self.board_width + 10
-        panel_y = 10
+        panel_y = getattr(self, '_next_panel_y', 20)  # 紧接上一个面板
         panel_width = self.info_panel_width - 20
-        panel_height = 200  # 固定高度，为控制说明留出空间
-        
+        padding = 18
+        line_gap = 28
+        # 计算内容高度
+        info_texts = [
+            f"步数: {self.step_count}",
+            f"玩家分数: {info.get('player1_score', 0)}",
+            f"剩余豆子: {info.get('dots_remaining', 0)}",
+            f"AI难度: {self.ai_level}",
+            "",
+            "当前动作:",
+            f"玩家(吃豆人): {self.last_actions.get(1, 'stay')}",
+            f"{self.ai_level}(幽灵): {self.last_actions.get(2, 'stay')}"
+        ]
+        panel_height = 60 + len(info_texts) * line_gap
         # 绘制背景
         panel_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
         pygame.draw.rect(self.screen, self.colors['info_bg'], panel_rect)
-        pygame.draw.rect(self.screen, self.colors['border'], panel_rect, 2)
-        
-        # 绘制标题
+        pygame.draw.rect(self.screen, self.colors['border'], panel_rect, 3)
+        # 居中标题
         title_text = self.title_font.render("游戏信息", True, self.colors['title_text'])
-        self.screen.blit(title_text, (panel_x + 15, panel_y + 10))
-        
-        # 绘制游戏信息
-        y_offset = 45
-        
-        ai_type = "高级AI" if self.ai_level == 'advanced' else "基础AI"
-        
-        if self.player_role == 'pacman':
-            # 玩家是吃豆人
-            info_texts = [
-                f"步数: {self.step_count}",
-                f"玩家分数: {info.get('player1_score', 0)}",
-                f"剩余豆子: {info.get('dots_remaining', 0)}",
-                f"AI难度: {ai_type}",
-                "",
-                "当前动作:",
-                f"玩家(吃豆人): {self.last_actions.get(1, 'stay')}",
-                f"{ai_type}(幽灵): {self.last_actions.get(2, 'stay')}"
-            ]
-        else:
-            # 玩家是幽灵
-            info_texts = [
-                f"步数: {self.step_count}",
-                f"{ai_type}分数: {info.get('player1_score', 0)}",
-                f"剩余豆子: {info.get('dots_remaining', 0)}",
-                f"AI难度: {ai_type}",
-                "",
-                "当前动作:",
-                f"{ai_type}(吃豆人): {self.last_actions.get(1, 'stay')}",
-                f"玩家(幽灵): {self.last_actions.get(2, 'stay')}"
-            ]
-        
+        title_rect = title_text.get_rect(center=(panel_x + panel_width//2, panel_y + 24))
+        self.screen.blit(title_text, title_rect)
+        # 内容
+        y_offset = panel_y + 54
         for text in info_texts:
-            if text:  # 跳过空行
+            if text:
                 text_surface = self.font.render(text, True, self.colors['text'])
-                self.screen.blit(text_surface, (panel_x + 15, panel_y + y_offset))
-            y_offset += 22  # 减小行间距
+                self.screen.blit(text_surface, (panel_x + padding, y_offset))
+            y_offset += line_gap
     
     def handle_events(self):
         """处理事件 - 支持AI模式"""
