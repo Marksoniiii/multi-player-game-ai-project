@@ -194,7 +194,7 @@ class QianwenClient(BaseLLMClient):
                 url,
                 headers=headers,
                 json=data,
-                timeout=self.config.timeout
+                timeout=60  # 增加超时时间到60秒
             )
 
             if response.status_code == 200:
@@ -247,6 +247,7 @@ class SimulatorClient(BaseLLMClient):
     
     def __init__(self, config: LLMConfig):
         super().__init__(config)
+        self.used_idioms = set()  # 跟踪已使用的成语
         # 预置一些成语和描述
         self.idiom_database = {
             "画蛇添足": "做了多余的事情，反而坏了事。古代有人画蛇比赛，有人给蛇画了脚，结果失败了。",
@@ -292,7 +293,18 @@ class SimulatorClient(BaseLLMClient):
     
     def _generate_question(self) -> str:
         """生成成语题目"""
-        idiom = random.choice(list(self.idiom_database.keys()))
+        # 获取未使用的成语
+        available_idioms = [idiom for idiom in self.idiom_database.keys() if idiom not in self.used_idioms]
+        
+        # 如果所有成语都用过了，重置已使用列表
+        if not available_idioms:
+            self.used_idioms.clear()
+            available_idioms = list(self.idiom_database.keys())
+        
+        # 选择一个未使用的成语
+        idiom = random.choice(available_idioms)
+        self.used_idioms.add(idiom)
+        
         description = self.idiom_database[idiom]
         
         # 随机选择出题方式
