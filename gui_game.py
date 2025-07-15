@@ -327,18 +327,17 @@ class MultiGameGUI:
                     self._create_ai_agent()
                     self.reset_game()
                 elif button_name.endswith('_ai'):
-                    # 更新选中的AI
-                    old_ai = f'{self.selected_ai.lower()}_ai'
-                    if old_ai in self.buttons:
-                        self.buttons[old_ai]['color'] = COLORS['LIGHT_GRAY']
-                    
+                    # 修复：先将所有AI按钮颜色重置为灰色
+                    for ai_btn in ['random_ai', 'minimax_ai', 'mcts_ai']:
+                        if ai_btn in self.buttons:
+                            self.buttons[ai_btn]['color'] = COLORS['LIGHT_GRAY']
+                    # 设置当前选中的AI
                     if button_name == 'random_ai':
                         self.selected_ai = "RandomBot"
                     elif button_name == 'minimax_ai':
                         self.selected_ai = "MinimaxBot"
                     elif button_name == 'mcts_ai':
                         self.selected_ai = "MCTSBot"
-                    
                     self.buttons[button_name]['color'] = COLORS['YELLOW']
                     self._create_ai_agent()
                     self.reset_game()
