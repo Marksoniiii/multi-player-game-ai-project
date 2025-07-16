@@ -66,8 +66,8 @@ class MultiGameGUI:
         self.paused = False
         
         # UI元素
-        self.button_height = 34  # 统一按钮高度
-        self.vertical_gap = 48   # 统一按钮间距
+        self.button_height = 30  # 统一按钮高度（原34，改为30）
+        self.vertical_gap = 32   # 统一按钮间距（原48，改为32）
         self.buttons = self._create_buttons()
         self.cell_size = 25
         self.margin = 50
@@ -112,7 +112,7 @@ class MultiGameGUI:
         button_height = self.button_height
         vertical_gap = self.vertical_gap
         start_x = 650
-        start_y = 60  # 按钮起始Y坐标
+        start_y = 40  # 按钮起始Y坐标（原60，改为40）
 
         buttons = {
             # 游戏选择
@@ -128,44 +128,44 @@ class MultiGameGUI:
             },
             # 先手选择（仅五子棋）
             'player_first': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 3 + 10, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 3, button_width, button_height),
                 'text': '玩家先手',
                 'color': COLORS['YELLOW']
             },
             'ai_first': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 4 + 10, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 4, button_width, button_height),
                 'text': 'AI先手',
                 'color': COLORS['LIGHT_GRAY']
             },
             # AI选择
             'random_ai': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 5 + 30, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 6, button_width, button_height),
                 'text': 'Random AI',
                 'color': COLORS['YELLOW']
             },
             'minimax_ai': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 6 + 30, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 7, button_width, button_height),
                 'text': 'Minimax AI',
                 'color': COLORS['LIGHT_GRAY']
             },
             'mcts_ai': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 7 + 30, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 8, button_width, button_height),
                 'text': 'MCTS AI',
                 'color': COLORS['LIGHT_GRAY']
             },
             # 控制按钮
             'new_game': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 8 + 60, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 10, button_width, button_height),
                 'text': 'New Game',
                 'color': COLORS['GREEN']
             },
             'pause': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 9 + 60, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 11, button_width, button_height),
                 'text': 'Pause',
                 'color': COLORS['ORANGE']
             },
             'quit': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 10 + 60, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 12, button_width, button_height),
                 'text': 'Quit',
                 'color': COLORS['RED']
             }
@@ -639,15 +639,15 @@ class MultiGameGUI:
 
         # 绘制标题，调整Y坐标避免重叠
         title_text = self.font_medium.render("Game Selection:", True, COLORS['BLACK'])
-        self.screen.blit(title_text, (self.buttons['gomoku_game']['rect'].x, self.buttons['gomoku_game']['rect'].y - 32))
+        self.screen.blit(title_text, (self.buttons['gomoku_game']['rect'].x, self.buttons['gomoku_game']['rect'].y - 28))
 
         # 绘制先手选择标题
         if self.current_game == "gomoku":
             first_player_title = self.font_medium.render("First Player:", True, COLORS['BLACK'])
-            self.screen.blit(first_player_title, (self.buttons['player_first']['rect'].x, self.buttons['player_first']['rect'].y - 25))
+            self.screen.blit(first_player_title, (self.buttons['player_first']['rect'].x, self.buttons['player_first']['rect'].y - 28))
 
         ai_title_text = self.font_medium.render("AI Selection:", True, COLORS['BLACK'])
-        self.screen.blit(ai_title_text, (self.buttons['random_ai']['rect'].x, self.buttons['random_ai']['rect'].y - 32))
+        self.screen.blit(ai_title_text, (self.buttons['random_ai']['rect'].x, self.buttons['random_ai']['rect'].y - 28))
 
         # 绘制操作说明，整体下移，避免与底部按钮重叠
         if self.current_game == "gomoku":
