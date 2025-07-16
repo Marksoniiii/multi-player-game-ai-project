@@ -7,9 +7,11 @@ LLM管理器
 import json
 import time
 import random
+import os
+import subprocess
+import requests
 from typing import Dict, List, Any, Optional
 from abc import ABC, abstractmethod
-import requests
 from dataclasses import dataclass
 
 
@@ -41,6 +43,9 @@ class BaseLLMClient(ABC):
     def is_available(self) -> bool:
         """检查模型是否可用"""
         pass
+
+
+
 
 
 class GeminiClient(BaseLLMClient):
@@ -242,6 +247,44 @@ class QianwenClient(BaseLLMClient):
             return False
 
 
+class BedrockClient(BaseLLMClient):
+    """Amazon Bedrock客户端"""
+    
+    def __init__(self, config: LLMConfig):
+        super().__init__(config)
+        self.model_path = config.base_url  # 使用base_url字段存储模型路径
+        self.model_id = config.model_name or "anthropic.claude-3-sonnet-20240229-v1:0"
+        self.aws_region = config.api_key or "us-east-1"  # 使用api_key字段存储AWS区域
+        
+    def generate_text(self, prompt: str, **kwargs) -> str:
+        """调用Amazon Bedrock模型生成文本"""
+        try:
+            # 使用安全的Bedrock客户端
+            from utils.bedrock_client import SafeBedrockClient
+            
+            # 创建安全的Bedrock客户端
+            bedrock_client = SafeBedrockClient(
+                model_path=self.model_path,
+                model_id=self.model_id,
+                aws_region=self.aws_region
+            )
+            
+            # 生成文本
+            return bedrock_client.generate_text(prompt, **kwargs)
+                
+        except Exception as e:
+            raise Exception(f"Bedrock模型调用失败: {str(e)}")
+    
+    def is_available(self) -> bool:
+        """检查Bedrock模型是否可用"""
+        try:
+            # 尝试生成测试文本
+            test_response = self.generate_text("测试", max_tokens=10)
+            return len(test_response) > 0
+        except:
+            return False
+
+
 class SimulatorClient(BaseLLMClient):
     """模拟器客户端（用于测试）"""
     
@@ -378,7 +421,8 @@ class LLMManager:
         self.current_client = None
         self.available_models = {
             "gemini": "Google Gemini",
-            "qianwen": "阿里千问2.5Max",
+            "qianwen": "千问",
+            "bedrock": "Amazon Bedrock",
             "simulator": "模拟器（测试用）"
         }
         # 确保始终有一个可用的备用模型
@@ -407,6 +451,8 @@ class LLMManager:
                 client = QianwenClient(config)
             elif model_type == "simulator":
                 client = SimulatorClient(config)
+            elif model_type == "bedrock":
+                client = BedrockClient(config)
             else:
                 raise ValueError(f"不支持的模型类型: {model_type}")
 

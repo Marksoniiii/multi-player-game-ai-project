@@ -138,7 +138,8 @@ class IdiomGuessingGame(BaseGame):
                 "question": self.current_question,
                 "answer": self.current_answer,
                 "player": self.get_current_player(),
-                "timestamp": time.time()
+                "timestamp": time.time(),
+                "source": question_data.get("source", "unknown")  # 记录来源
             })
             
             return question_data
@@ -195,7 +196,8 @@ class IdiomGuessingGame(BaseGame):
             
             return {
                 "hint": hint_text,
-                "remaining_hints": self.max_hints - self.hint_count
+                "remaining_hints": self.max_hints - self.hint_count,
+                "hint_method": "ai_generated"  # 标记提示方法
             }
             
         except Exception as e:
@@ -251,6 +253,7 @@ class IdiomGuessingGame(BaseGame):
             answer = ""
             question = ""
             
+            # 解析AI返回的成语和描述
             for line in lines:
                 line = line.strip()
                 if line.startswith("成语："):
@@ -258,21 +261,26 @@ class IdiomGuessingGame(BaseGame):
                 elif line.startswith("描述："):
                     question = line.replace("描述：", "").strip()
             
-            if not answer or not question:
-                # 尝试其他解析方式
-                if "：" in response:
-                    parts = response.split("：")
-                    if len(parts) >= 2:
-                        answer = parts[1].split('\n')[0].strip()
-                        question = response.split("描述：")[-1].strip() if "描述：" in response else parts[0].strip()
+            # 清理答案中的标点符号或引号
+            answer = answer.replace("「", "").replace("」", "").replace("'", "").replace('"', "")
             
+            # 如果AI没有返回成语和描述，使用备用题库
             if not answer or not question:
-                raise ValueError("无法解析LLM响应")
+                print("AI未返回完整格式，使用备用题库")
+                return self._get_fallback_question()
+            
+            # 验证答案是否为四字成语
+            if len(answer) != 4:
+                print(f"AI返回的答案不是四字成语: {answer}，使用备用题库")
+                return self._get_fallback_question()
+            
+            print(f"AI生成题目成功 - 成语: {answer}, 描述: {question}")
             
             return {
                 "question": question,
                 "answer": answer,
-                "question_id": self.current_question_id + 1
+                "question_id": self.current_question_id + 1,
+                "source": "ai"  # 标记为AI生成
             }
             
         except Exception as e:
@@ -286,43 +294,45 @@ class IdiomGuessingGame(BaseGame):
             {"question": "这个成语比喻死守陈规，不知变通。讲的是一个人守着树等兔子的故事。", "answer": "守株待兔"},
             {"question": "这个成语比喻出了问题后想办法补救。讲的是羊丢了再修羊圈的故事。", "answer": "亡羊补牢"},
             {"question": "这个成语比喻观念陈旧，不知变通。讲的是在船上找掉到水里的剑的故事。", "answer": "刻舟求剑"},
+            {"question": "这个成语比喻刻苦学习。讲的是用绳子吊着头发防止瞌睡，用锥子刺大腿保持清醒。", "answer": "悬梁刺股"},
+            {"question": "这个成语比喻勤奋好学。讲的是在墙上凿洞借邻居家的灯光看书。", "answer": "凿壁偷光"},
+            {"question": "这个成语比喻心情非常愉快，就像花朵盛开一样。", "answer": "心花怒放"},
+            {"question": "这个成语比喻人的才能很高，就像装了八斗粮食一样。", "answer": "才高八斗"},
+            {"question": "这个成语比喻做事非常认真，连吃饭睡觉都忘记了。", "answer": "废寝忘食"},
+            {"question": "这个成语比喻做事很有毅力，就像用刀刻东西一样坚持不懈。", "answer": "锲而不舍"},
         ]
         
         selected = random.choice(fallback_questions)
         return {
             "question": selected["question"],
             "answer": selected["answer"],
-            "question_id": self.current_question_id + 1
+            "question_id": self.current_question_id + 1,
+            "source": "fallback"  # 标记为备用题库
         }
     
     def _judge_answer(self, answer: str) -> Dict[str, Any]:
         """判断答案"""
         try:
-            # 构建判断提示词
-            prompt = self._build_judge_prompt(answer)
-            
-            # 调用LLM判断
-            response = llm_manager.generate_text(prompt)
-            
-            # 解析判断结果
-            is_correct = self._parse_judge_response(response, answer)
+            # 直接比较答案，不使用AI判断
+            is_correct = self._simple_compare(answer)
             
             result = {
                 "correct": is_correct,
                 "user_answer": answer,
                 "correct_answer": self.current_answer,
-                "response": response
+                "judge_method": "direct_compare"  # 标记判断方法
             }
             
             if is_correct:
-                result["message"] = f"恭喜你，回答正确！正确答案是'{self.current_answer}'。"
-                # 自动生成下一题
-                next_question = self.generate_question()
-                result["next_question"] = next_question
+                result["message"] = f"恭喜你，回答正确！"
             else:
-                result["message"] = f"很遗憾，回答错误。'{answer}'不是正确答案。"
+                result["message"] = f"很遗憾，回答错误。正确答案是：{self.current_answer}"
                 if self.hint_count < self.max_hints:
                     result["hint_available"] = True
+            
+            # 无论对错都生成新题目，避免作弊
+            next_question = self.generate_question()
+            result["next_question"] = next_question
             
             return result
             
@@ -331,43 +341,7 @@ class IdiomGuessingGame(BaseGame):
             # 降级到简单比较
             return self._simple_judge(answer)
     
-    def _build_judge_prompt(self, answer: str) -> str:
-        """构建判断提示词"""
-        prompt = f"""你是一个成语猜谜游戏的判断者。
 
-题目：{self.current_question}
-正确答案：{self.current_answer}
-用户答案：{answer}
-
-请判断用户的答案是否正确。考虑以下情况：
-1. 完全匹配正确答案
-2. 意思相同但表达略有不同
-3. 同义成语
-4. 错别字但意思明确
-
-请用以下格式回复：
-判断：[正确/错误]
-说明：[简短解释]
-
-现在请判断："""
-        
-        return prompt
-    
-    def _parse_judge_response(self, response: str, answer: str) -> bool:
-        """解析判断响应"""
-        try:
-            # 检查响应中的关键词
-            if "正确" in response:
-                return True
-            elif "错误" in response:
-                return False
-            else:
-                # 降级到简单比较
-                return self._simple_compare(answer)
-                
-        except Exception as e:
-            print(f"解析判断失败: {e}")
-            return self._simple_compare(answer)
     
     def _simple_judge(self, answer: str) -> Dict[str, Any]:
         """简单判断"""
@@ -380,24 +354,34 @@ class IdiomGuessingGame(BaseGame):
         }
         
         if is_correct:
-            result["message"] = f"恭喜你，回答正确！正确答案是'{self.current_answer}'。"
-            # 自动生成下一题
-            next_question = self.generate_question()
-            result["next_question"] = next_question
+            result["message"] = f"恭喜你，回答正确！"
         else:
-            result["message"] = f"很遗憾，回答错误。'{answer}'不是正确答案。"
+            result["message"] = f"很遗憾，回答错误。正确答案是：{self.current_answer}"
             if self.hint_count < self.max_hints:
                 result["hint_available"] = True
+        
+        # 无论对错都生成新题目，避免作弊
+        next_question = self.generate_question()
+        result["next_question"] = next_question
         
         return result
     
     def _simple_compare(self, answer: str) -> bool:
         """简单比较答案"""
         # 去除空格和标点
-        clean_answer = answer.replace(" ", "").replace("，", "").replace("。", "").replace("！", "")
-        clean_correct = self.current_answer.replace(" ", "").replace("，", "").replace("。", "").replace("！", "")
+        clean_answer = answer.replace(" ", "").replace("，", "").replace("。", "").replace("！", "").replace("？", "")
+        clean_correct = self.current_answer.replace(" ", "").replace("，", "").replace("。", "").replace("！", "").replace("？", "")
         
-        return clean_answer == clean_correct
+        # 完全匹配
+        if clean_answer == clean_correct:
+            return True
+        
+        # 支持一些常见的变体
+        # 例如：画蛇添足 vs 画蛇添足
+        # 例如：守株待兔 vs 守株待兔
+        # 这里可以添加更多的同义词或变体处理
+        
+        return False
     
     def _build_hint_prompt(self) -> str:
         """构建提示提示词"""

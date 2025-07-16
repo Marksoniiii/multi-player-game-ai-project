@@ -14,7 +14,7 @@ class MinimaxBot(BaseAgent):
     4. 基于棋形识别的高级启发式评估函数
     5. 智能走法排序以优化剪枝效率
     """
-    
+    # 初始化方法：设置 Bot 的名称、玩家 ID、最大搜索深度 (max_depth) 和每次决策的最长时间 (timeout)。
     def __init__(self, name="MinimaxBot", player_id=1, max_depth=4, timeout=5):
         super().__init__(name, player_id)
         self.max_depth = max_depth
@@ -24,17 +24,17 @@ class MinimaxBot(BaseAgent):
         
         # 棋形和对应分数
         self.patterns = {
-            'FIVE': 100000,
-            'OPEN_FOUR': 10000,
-            'RUSH_FOUR': 5000,
-            'OPEN_THREE': 2000,
-            'RUSH_THREE': 800,
-            'OPEN_TWO': 400,
-            'RUSH_TWO': 100,
-            'BLOCKED_ONE': 5
+            'FIVE': 100000, # 五连
+            'OPEN_FOUR': 10000, # 活四
+            'RUSH_FOUR': 5000, # 冲四
+            'OPEN_THREE': 2000, #  活三
+            'RUSH_THREE': 800, # 冲三
+            'OPEN_TWO': 400, # 活二
+            'RUSH_TWO': 100, # 冲二
+            'BLOCKED_ONE': 5 # 被堵活一
         }
         
-        self.zobrist_table = None
+        self.zobrist_table = None # 置换表
 
     def _init_zobrist(self, board_size):
         """初始化Zobrist哈希表"""

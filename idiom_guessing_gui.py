@@ -198,14 +198,15 @@ class IdiomGuessingGUI:
         for i, (model_id, model_name) in enumerate(models.items()):
             rb = tk.Radiobutton(model_frame, text=model_name, 
                                variable=self.model_var, value=model_id,
-                               font=("Arial", 10), bg='#f0f0f0')
+                               font=("Arial", 10), bg='#f0f0f0',
+                               command=self.update_model_labels)
             rb.grid(row=i, column=0, sticky=tk.W, pady=2)
         
         # API设置
-        api_frame = ttk.LabelFrame(settings_window, text="API设置", padding="10")
+        api_frame = ttk.LabelFrame(settings_window, text="模型设置", padding="10")
         api_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), padx=10, pady=5)
         
-        tk.Label(api_frame, text="API Key:", font=("Arial", 10), bg='#f0f0f0').grid(row=0, column=0, sticky=tk.W)
+        tk.Label(api_frame, text="API Key/模型路径:", font=("Arial", 10), bg='#f0f0f0').grid(row=0, column=0, sticky=tk.W)
         self.api_key_entry = tk.Entry(api_frame, show="*", width=30)
         self.api_key_entry.grid(row=0, column=1, padx=5)
         
@@ -213,9 +214,33 @@ class IdiomGuessingGUI:
         self.base_url_entry = tk.Entry(api_frame, width=30)
         self.base_url_entry.grid(row=1, column=1, padx=5)
         
+        # Bedrock专用设置
+        self.bedrock_frame = ttk.LabelFrame(settings_window, text="Bedrock设置", padding="10")
+        self.bedrock_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), padx=10, pady=5)
+        
+        # 显示固定配置信息
+        tk.Label(self.bedrock_frame, text="AWS区域:", font=("Arial", 10), bg='#f0f0f0').grid(row=0, column=0, sticky=tk.W)
+        aws_region_label = tk.Label(self.bedrock_frame, text="us-east-1", font=("Arial", 10, "bold"), 
+                                   bg='#e8f5e8', fg='#2c5aa0', relief=tk.SUNKEN, padx=5, pady=2)
+        aws_region_label.grid(row=0, column=1, padx=5, sticky=(tk.W, tk.E))
+        
+        tk.Label(self.bedrock_frame, text="模型ID:", font=("Arial", 10), bg='#f0f0f0').grid(row=1, column=0, sticky=tk.W)
+        model_id_label = tk.Label(self.bedrock_frame, text="anthropic.claude-3-sonnet-20240229-v1:0", 
+                                 font=("Arial", 9, "bold"), bg='#e8f5e8', fg='#2c5aa0', 
+                                 relief=tk.SUNKEN, padx=5, pady=2)
+        model_id_label.grid(row=1, column=1, padx=5, sticky=(tk.W, tk.E))
+        
+        # 添加说明文字
+        info_label = tk.Label(self.bedrock_frame, text="✅ Bedrock模型已预配置，无需修改", 
+                             font=("Arial", 9), bg='#f0f0f0', fg='#27ae60')
+        info_label.grid(row=2, column=0, columnspan=2, pady=5)
+        
+        # 配置网格权重
+        self.bedrock_frame.columnconfigure(1, weight=1)
+        
         # 游戏模式
         mode_frame = ttk.LabelFrame(settings_window, text="游戏模式", padding="10")
-        mode_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), padx=10, pady=5)
+        mode_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), padx=10, pady=5)
         
         self.mode_var = tk.StringVar(value="single")
         
@@ -231,7 +256,7 @@ class IdiomGuessingGUI:
         
         # 玩家设置
         player_frame = ttk.LabelFrame(settings_window, text="玩家设置", padding="10")
-        player_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), padx=10, pady=5)
+        player_frame.grid(row=4, column=0, sticky=(tk.W, tk.E), padx=10, pady=5)
         
         tk.Label(player_frame, text="玩家1:", font=("Arial", 10), bg='#f0f0f0').grid(row=0, column=0, sticky=tk.W)
         self.player1_entry = tk.Entry(player_frame, width=20)
@@ -245,7 +270,7 @@ class IdiomGuessingGUI:
         
         # 时间设置
         time_frame = ttk.LabelFrame(settings_window, text="时间设置", padding="10")
-        time_frame.grid(row=4, column=0, sticky=(tk.W, tk.E), padx=10, pady=5)
+        time_frame.grid(row=5, column=0, sticky=(tk.W, tk.E), padx=10, pady=5)
         
         tk.Label(time_frame, text="时间限制(秒):", font=("Arial", 10), bg='#f0f0f0').grid(row=0, column=0, sticky=tk.W)
         self.time_var = tk.StringVar(value="180")
@@ -255,7 +280,7 @@ class IdiomGuessingGUI:
         
         # 按钮
         button_frame = ttk.Frame(settings_window)
-        button_frame.grid(row=5, column=0, pady=10)
+        button_frame.grid(row=6, column=0, pady=10)
         
         apply_button = tk.Button(button_frame, text="应用设置", 
                                command=lambda: self.apply_settings(settings_window),
@@ -269,6 +294,44 @@ class IdiomGuessingGUI:
         
         # 配置网格权重
         settings_window.columnconfigure(0, weight=1)
+        
+        # 初始化标签
+        self.update_model_labels()
+    
+    def update_model_labels(self):
+        """根据选择的模型类型更新标签"""
+        model_type = self.model_var.get()
+        
+        # 隐藏/显示Bedrock设置框架
+        if model_type == "bedrock":
+            self.bedrock_frame.grid()  # 显示Bedrock设置
+        else:
+            self.bedrock_frame.grid_remove()  # 隐藏Bedrock设置
+        
+        if model_type == "bedrock":
+            # Bedrock模型
+            self.api_key_entry.config(show="")  # 显示模型路径
+            self.base_url_entry.config(state="disabled")  # 禁用第二个输入框
+            # 更新标签文本
+            for widget in self.api_key_entry.master.winfo_children():
+                if isinstance(widget, tk.Label) and "API Key" in widget.cget("text"):
+                    widget.config(text="模型路径:")
+                elif isinstance(widget, tk.Label) and "Base URL" in widget.cget("text"):
+                    widget.config(text="模型路径 (可选):")
+            
+            # 在模型路径输入框中显示默认值
+            if not self.api_key_entry.get():
+                self.api_key_entry.insert(0, "amazon-bedrock-voice-conversation")
+        else:
+            # 在线模型
+            self.api_key_entry.config(show="*")  # 隐藏API密钥
+            self.base_url_entry.config(state="normal")  # 启用第二个输入框
+            # 更新标签文本
+            for widget in self.api_key_entry.master.winfo_children():
+                if isinstance(widget, tk.Label) and "模型路径" in widget.cget("text"):
+                    widget.config(text="API Key:")
+                elif isinstance(widget, tk.Label) and "API端点" in widget.cget("text"):
+                    widget.config(text="Base URL (可选):")
     
     def apply_settings(self, settings_window):
         """应用设置"""
@@ -278,7 +341,54 @@ class IdiomGuessingGUI:
             api_key = self.api_key_entry.get()
             base_url = self.base_url_entry.get()
             
-            if model_type != "simulator" and not api_key:
+            # 验证输入
+            if model_type == "bedrock":
+                # Bedrock模型配置 - 使用固定配置
+                aws_region = "us-east-1"  # 固定AWS区域
+                model_path = api_key if api_key else "amazon-bedrock-voice-conversation"  # 使用输入的路径或默认路径
+                model_id = "anthropic.claude-3-sonnet-20240229-v1:0"  # 固定模型ID
+                
+                # 配置Bedrock模型
+                success = llm_manager.configure_model(
+                    model_type=model_type,
+                    api_key=aws_region,  # AWS区域
+                    base_url=model_path,  # 模型路径
+                    model_name=model_id   # 模型ID
+                )
+                
+                if not success:
+                    messagebox.showerror("错误", "Bedrock模型配置失败")
+                    return
+                
+                llm_manager.set_current_model(model_type)
+                
+                # 设置游戏参数
+                self.game_mode = self.mode_var.get()
+                time_limit = int(self.time_var.get())
+                
+                # 设置玩家
+                if self.game_mode == "single":
+                    self.players = [self.player1_entry.get() or "玩家1"]
+                else:
+                    self.players = [
+                        self.player1_entry.get() or "玩家1",
+                        self.player2_entry.get() or "玩家2"
+                    ]
+                
+                # 重新初始化环境
+                self.env = IdiomGuessingEnv(time_limit=time_limit)
+                
+                # 更新界面
+                self.update_ui_state()
+                
+                # 显示消息
+                model_name = llm_manager.get_available_models()[model_type]
+                self.add_message(f"设置已应用：{model_name}，{'双人对战' if self.game_mode == 'pvp' else '单人模式'}")
+                
+                settings_window.destroy()
+                return
+                
+            elif model_type != "simulator" and not api_key:
                 messagebox.showerror("错误", "请输入API Key")
                 return
             
@@ -383,11 +493,12 @@ class IdiomGuessingGUI:
             # 处理结果
             if action_result.get("correct", False):
                 self.add_message(f"✅ 正确！{action_result.get('message', '')}")
-                # 自动生成下一题
-                if "next_question" in action_result:
-                    self.display_question(action_result["next_question"])
             else:
                 self.add_message(f"❌ {action_result.get('message', '答案错误')}")
+            
+            # 无论对错都更新题目显示，避免作弊
+            if "next_question" in action_result:
+                self.display_question(action_result["next_question"])
             
             # 更新界面
             self.update_ui_state()
