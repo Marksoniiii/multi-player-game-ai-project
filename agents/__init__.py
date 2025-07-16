@@ -11,9 +11,6 @@ from .ai_bots.mcts_bot import MCTSBot
 from .ai_bots.rl_bot import RLBot
 from .ai_bots.behavior_tree_bot import BehaviorTreeBot
 from .ai_bots.snake_ai import SnakeAI
-from .ai_bots.llm_chess_assistant import LLMChessAssistant
-from .ai_bots.enhanced_chess_ai import EnhancedChessAI
-from .ai_bots.stockfish_chess_ai import StockfishChessAI
 from .ai_bots.llm_idiom_bot import LLMIdiomBot
 
 __all__ = [
@@ -25,8 +22,5 @@ __all__ = [
     'RLBot',
     'BehaviorTreeBot',
     'SnakeAI',
-    'LLMChessAssistant',
-    'EnhancedChessAI',
-    'StockfishChessAI',
     'LLMIdiomBot'
 ]
