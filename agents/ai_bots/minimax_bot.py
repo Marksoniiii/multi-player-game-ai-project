@@ -5,7 +5,7 @@ from agents.base_agent import BaseAgent
 
 class MinimaxBot(BaseAgent):
     """
-    高级Minimax AI Bot - 平衡性能与智能
+    Minimax AI Bot - 平衡性能与智能
     
     核心特性:
     1. 迭代深化搜索 (Iterative Deepening)
