@@ -716,7 +716,11 @@ class MultiGameGUI:
         # 游戏信息
         info_y = status_y + 40
         if self.current_game == "gomoku":
-            player_info = f"Black: Human Player  White: {self.ai_agent.name if self.ai_agent else 'AI'}"
+            # 根据先手设置动态显示角色分配
+            if hasattr(self, 'gomoku_first') and self.gomoku_first == 'ai':
+                player_info = f"Black: {self.ai_agent.name if self.ai_agent else 'AI'}  White: Human Player"
+            else:
+                player_info = f"Black: Human Player  White: {self.ai_agent.name if self.ai_agent else 'AI'}"
         elif self.current_game == "snake":
             if hasattr(self.env.game, 'snake1') and hasattr(self.env.game, 'snake2'):
                 len1 = len(self.env.game.snake1) if self.env.game.alive1 else 0

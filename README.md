@@ -207,8 +207,7 @@ multi-player-game-ai-project/
 ├── gui_game.py           # 多游戏图形界面
 ├── snake_gui.py          # 贪吃蛇专用GUI
 ├── start_games.py        # 启动脚本
-├── main.py               # 命令行主程序
-├── test_project.py       # 测试程序
+
 ├── config.py             # 配置文件
 ├── requirements.txt      # 依赖列表
 ├── .gitignore           # Git忽略文件
@@ -262,7 +261,7 @@ multi-player-game-ai-project/
 3. **自定义**: 修改AI参数或添加新算法
 
 ### 开发者
-1. **测试**: 先运行 `python test_project.py`
+1. **测试**: 直接运行各游戏进行测试
 2. **扩展**: 参考现有代码添加新游戏或AI
 3. **调试**: 使用命令行模式便于调试
 

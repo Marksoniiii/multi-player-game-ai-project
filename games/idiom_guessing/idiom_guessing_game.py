@@ -270,6 +270,22 @@ class IdiomGuessingGame(BaseGame):
                 print("AI未返回完整格式，使用备用题库")
                 return self._get_fallback_question()
             
+            # 清理描述中的多余内容
+            question = question.strip()
+            # 移除描述开头的模板化内容
+            if question.startswith("请根据以下描述猜成语："):
+                question = question.replace("请根据以下描述猜成语：", "").strip()
+            elif question.startswith("题目："):
+                question = question.replace("题目：", "").strip()
+            elif question.startswith("这个成语的意思是："):
+                question = question.replace("这个成语的意思是：", "").strip()
+            elif question.startswith("有一个成语，它的含义是"):
+                question = question.replace("有一个成语，它的含义是", "").strip()
+                if question.endswith("，请猜一猜。"):
+                    question = question.replace("，请猜一猜。", "").strip()
+                elif question.endswith("。请问是什么成语？"):
+                    question = question.replace("。请问是什么成语？", "").strip()
+            
             # 验证答案是否为四字成语
             if len(answer) != 4:
                 print(f"AI返回的答案不是四字成语: {answer}，使用备用题库")

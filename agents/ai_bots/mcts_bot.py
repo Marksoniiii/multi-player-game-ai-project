@@ -11,7 +11,15 @@ import config
 
 class MCTSNode:
     """MCTS节点，为启发式搜索优化"""
-    
+    # 构建 MCTS 搜索树的基本单元。每个 MCTSNode 对象代表游戏树中的一个特定局面（状态）。
+    # 每个节点包含以下属性：
+    # - state: 当前局面
+    # - parent: 父节点
+    # - action: 从父节点到当前节点的动作
+    # - children: 当前节点的所有子节点
+    # - wins: 当前节点获胜次数
+    # - visits: 当前节点被访问次数
+    # - prior: 先验概率/价值
     def __init__(self, game_state, parent=None, action=None, prior=0.0):
         self.state = game_state
         self.parent = parent
@@ -55,8 +63,7 @@ class MCTSNode:
 
 class MCTSBot(BaseAgent):
     """
-    高级MCTS Bot - 融合专家策略
-    
+    MCTS Bot
     核心特性:
     1. AlphaGo式PUCT选择策略
     2. 由棋形评估驱动的启发式模拟和扩展
@@ -184,10 +191,38 @@ class MCTSBot(BaseAgent):
         return random.choices(actions, weights=probabilities, k=1)[0]
     
     def _evaluate_move(self, state, action, player_id):
-        """使用棋形评估来评估一个动作"""
+        """使用棋形评估来评估一个动作，并添加位置权重"""
         board_copy = state.board.copy()
         board_copy[action] = player_id
-        return self._evaluate_position(board_copy, player_id)
+        
+        # 基础棋形评估
+        base_score = self._evaluate_position(board_copy, player_id)
+        
+        # 添加位置权重 - 中心位置更有价值
+        r, c = action
+        board_size = board_copy.shape[0]
+        center = board_size // 2
+        # 计算到中心的距离
+        distance_to_center = abs(r - center) + abs(c - center)
+        
+        # 位置权重：中心位置加分，边缘位置减分
+        # 对于15x15盘，中心是(7,7)，最大距离是14
+        max_distance = board_size - 1
+        position_weight = (max_distance - distance_to_center) * 50  # 中心位置额外加分
+        
+        # 特殊处理：如果是空棋盘的第一手，大幅提升中心位置的价值
+        if self._is_empty_board(state.board):
+            if distance_to_center == 0:  # 中心位置
+                position_weight += 1000  # 中心位置价值
+            elif distance_to_center <= 2:  # 中心附近
+                position_weight += 500
+            else:  # 边缘位置
+                position_weight -= 200   
+        return base_score + position_weight
+    
+    def _is_empty_board(self, board):
+        """查棋盘是否为空"""
+        return np.all(board == 0)
 
     def _evaluate_position(self, board, player):
         """评估棋盘上某个玩家的分数"""

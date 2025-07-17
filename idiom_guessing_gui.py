@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 成语猜多多游戏GUI界面
 """

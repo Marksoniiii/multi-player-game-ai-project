@@ -17,17 +17,14 @@ def main():
     print("1. 多游戏GUI - 五子棋和贪吃蛇 (推荐)")
     print("2. 贪吃蛇专用GUI - 更好的贪吃蛇体验")
     print("3. 乒乓球 Pong - 玩家 vs AI 或 双人")
-    print("4. 吃豆人游戏 - 双人对战 (新增)")
-    print("5. 成语猜多多 - LLM智能出题游戏 (新增)")
-    print("6. 五子棋命令行版本")
-    print("7. 贪吃蛇命令行版本")
-    print("8. 运行测试")
-    print("9. 退出")
+    print("4. 吃豆人游戏 - 双人对战 ")
+    print("5. 成语猜多多 - LLM智能出题游戏 ")
+    print("6. 退出")
     print()
     
     while True:
         try:
-            choice = input("请输入选择 (1-9): ").strip()
+            choice = input("请输入选择 (1-6): ").strip()
             
             if choice == '1':
                 print("\n🎯 启动多游戏图形界面...")
@@ -105,7 +102,7 @@ def main():
                 print("\n🎯 启动成语猜多多...")
                 print("特性:")
                 print("- 智能LLM出题系统")
-                print("- 支持多种大语言模型 (Gemini, 千问2.5Max)")
+                print("- 支持多种大语言模型 (Gemini, 千问，本地anthropic.claude-3)")
                 print("- 单人挑战与双人对战模式")
                 print("- 3分钟限时挑战")
                 print("- 多样化出题方式 (故事、含义、反义词等)")
@@ -125,25 +122,25 @@ def main():
                 
             elif choice == '6':
                 print("\n♟️  启动五子棋命令行版本...")
-                subprocess.run([sys.executable, "main.py", "--game", "gomoku", "--player1", "human", "--player2", "random"])
+                print("❌ 命令行版本已移除，请使用图形界面版本")
                 break
                 
             elif choice == '7':
                 print("\n🐍 启动贪吃蛇命令行版本...")
-                subprocess.run([sys.executable, "main.py", "--game", "snake", "--player1", "human", "--player2", "snake_ai"])
+                print("❌ 命令行版本已移除，请使用图形界面版本")
                 break
                 
             elif choice == '8':
                 print("\n🧪 运行项目测试...")
-                subprocess.run([sys.executable, "test_project.py"])
+                print("❌ 测试文件已移除，请直接运行各游戏进行测试")
                 break
                 
-            elif choice == '9':
+            elif choice == '6':
                 print("\n👋 再见！")
                 sys.exit(0)
                 
             else:
-                print("❌ 无效选择，请输入 1-9")
+                print("❌ 无效选择，请输入 1-6")
                 
         except KeyboardInterrupt:
             print("\n\n👋 再见！")

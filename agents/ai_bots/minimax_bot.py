@@ -37,13 +37,18 @@ class MinimaxBot(BaseAgent):
         self.zobrist_table = None # 置换表
 
     def _init_zobrist(self, board_size):
-        """初始化Zobrist哈希表"""
+        """初始化Zobrist哈希表
+        Zobrist 哈希表的核心思想是为棋盘上的每一个“元素”
+        （例如，某个棋子在某个位置）预先生成一个随机的位串（bitstring）。
+        然后，通过对当前棋盘上所有存在的元素的随机位串进行位异或（XOR）运算，
+        来计算出代表当前棋盘状态的唯一哈希值。
+        """
         if self.zobrist_table is None:
             self.zobrist_table = np.random.randint(2**63, size=(board_size, board_size, 2), dtype=np.uint64)
 
     def _compute_zobrist_hash(self, board):
         """计算当前棋盘的Zobrist哈希值"""
-        h = np.uint64(0)
+        h = np.uint64(0) # 初始化一个64位无符号整数变量 h，并将其赋值为 0
         if self.zobrist_table is None:
              return h # 如果未初始化则返回0
 

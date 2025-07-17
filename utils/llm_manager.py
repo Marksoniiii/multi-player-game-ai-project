@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 LLM管理器
 统一管理多种大语言模型的接入
@@ -61,29 +60,51 @@ class GeminiClient(BaseLLMClient):
             if not self.config.api_key or self.config.api_key == "dummy_key":
                 raise Exception("请配置有效的Gemini API密钥")
             
+            # 使用正确的API端点 - 根据Google AI Studio官网
             url = f"{self.base_url}/gemini-2.0-flash:generateContent"
             headers = {
                 "Content-Type": "application/json",
-                "x-goog-api-key": self.config.api_key
+                "X-goog-api-key": self.config.api_key  # 修正header名称，使用大写X
             }
             
-            data = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": kwargs.get("temperature", self.config.temperature),
-                    "maxOutputTokens": kwargs.get("max_tokens", self.config.max_tokens),
-                    "topP": kwargs.get("top_p", 0.8),
-                    "topK": kwargs.get("top_k", 10)
-                }
+            # 构建请求体 - 严格按照Google官方格式
+            data: Dict[str, Any] = {
+                "contents": [
+                    {
+                        "parts": [
+                            {
+                                "text": prompt
+                            }
+                        ]
+                    }
+                ]
             }
+            
+            # 添加可选的生成配置
+            generation_config: Dict[str, Any] = {}
+            if kwargs.get("temperature") is not None:
+                generation_config["temperature"] = kwargs["temperature"]
+            if kwargs.get("max_tokens") is not None:
+                generation_config["maxOutputTokens"] = kwargs["max_tokens"]
+            if kwargs.get("top_p") is not None:
+                generation_config["topP"] = kwargs["top_p"]
+            if kwargs.get("top_k") is not None:
+                generation_config["topK"] = kwargs["top_k"]
+            
+            if generation_config:
+                data["generationConfig"] = generation_config
+            
+            # 增加超时时间，避免网络问题
+            timeout = max(self.config.timeout, 60)
             
             response = requests.post(
                 url, 
                 headers=headers, 
                 json=data, 
-                timeout=self.config.timeout
+                timeout=timeout
             )
             
+            # 详细的错误处理和日志
             if response.status_code == 200:
                 result = response.json()
                 
@@ -108,15 +129,21 @@ class GeminiClient(BaseLLMClient):
             else:
                 error_msg = f"API调用失败: {response.status_code}"
                 if response.status_code == 401:
-                    error_msg += " - API密钥无效"
+                    error_msg += " - API密钥无效或格式错误"
                 elif response.status_code == 403:
                     error_msg += " - 权限不足或配额耗尽"
                 elif response.status_code == 429:
-                    error_msg += " - 请求过于频繁"
+                    error_msg += " - 请求过于频繁，请稍后重试"
+                elif response.status_code == 400:
+                    error_msg += f" - 请求格式错误: {response.text}"
                 else:
                     error_msg += f" - {response.text}"
                 raise Exception(error_msg)
                 
+        except requests.exceptions.Timeout:
+            raise Exception("请求超时，请检查网络连接或增加超时时间")
+        except requests.exceptions.ConnectionError:
+            raise Exception("网络连接失败，请检查网络设置")
         except Exception as e:
             raise Exception(f"Gemini API调用失败: {str(e)}")
     
@@ -125,9 +152,11 @@ class GeminiClient(BaseLLMClient):
         try:
             if not self.config.api_key or self.config.api_key == "dummy_key":
                 return False
-            test_response = self.generate_text("测试", max_tokens=10)
+            # 使用简单的测试请求
+            test_response = self.generate_text("Hello", max_tokens=5)
             return len(test_response) > 0
-        except:
+        except Exception as e:
+            print(f"Gemini可用性检查失败: {str(e)}")
             return False
 
 
@@ -364,6 +393,7 @@ class SimulatorClient(BaseLLMClient):
         
         # 构造完整的出题响应，包含答案信息
         question_text = random.choice(question_types)
+        # 确保返回格式正确，避免解析错误
         return f"成语：{idiom}\n描述：{question_text}"
     
     def _clean_description(self, idiom: str, description: str) -> str:
@@ -470,10 +500,19 @@ class SimulatorClient(BaseLLMClient):
         
         # 如果字符在替换规则中，使用替换词
         if char in replacements:
-            return description.replace(char, replacements[char])
+            replacement = replacements[char]
+            # 简单的字符串替换，但避免重复
+            if char in description and replacement not in description:
+                return description.replace(char, replacement)
+            elif char in description:
+                # 如果替换词已经在描述中，使用更通用的替换
+                return description.replace(char, "某个字")
         
-        # 如果没有替换规则，尝试用更通用的描述
-        return description.replace(char, "某个字")
+        # 如果没有替换规则，使用通用替换
+        if char in description:
+            return description.replace(char, "某个字")
+        
+        return description
     
     def _judge_answer(self, prompt: str) -> str:
         """判断答案"""
@@ -574,6 +613,7 @@ class LLMManager:
                 print(f"警告：{model_type} 模型不可用，可能是API密钥无效或网络问题")
                 return False
 
+            # 只有在可用性检查通过后才存储客户端
             self.clients[model_type] = client
 
             # 如果是第一个配置的模型，自动设置为当前模型
@@ -606,16 +646,32 @@ class LLMManager:
             else:
                 raise Exception("未配置任何可用的LLM模型")
         
+        # 尝试当前模型
         try:
             return self.current_client.generate_text(prompt, **kwargs)
         except Exception as e:
             print(f"当前模型 {self.current_client.model_type} 生成失败: {str(e)}")
-            # 如果当前模型失败，尝试使用备用模型
-            if self.current_client.model_type != "simulator" and "simulator" in self.clients:
-                print("切换到备用模型")
+            
+            # 尝试其他可用模型
+            for model_type, client in self.clients.items():
+                if model_type != self.current_client.model_type and model_type != "simulator":
+                    try:
+                        print(f"尝试切换到 {model_type} 模型...")
+                        result = client.generate_text(prompt, **kwargs)
+                        print(f"成功使用 {model_type} 模型")
+                        return result
+                    except Exception as backup_e:
+                        print(f"{model_type} 模型也失败: {str(backup_e)}")
+                        continue
+            
+            # 最后尝试模拟器
+            if "simulator" in self.clients and self.current_client.model_type != "simulator":
+                print("切换到备用模拟器模型")
                 backup_client = self.clients["simulator"]
                 return backup_client.generate_text(prompt, **kwargs)
-            raise  # 如果没有备用模型，重新抛出异常
+            
+            # 如果所有模型都失败，抛出异常
+            raise Exception(f"所有配置的模型都不可用: {str(e)}")
     
     def is_model_available(self, model_type: str) -> bool:
         """检查模型是否可用"""
