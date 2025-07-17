@@ -1,5 +1,5 @@
 """
-Snake AI - 简洁实用版本
+Snake AI
 """
 import random
 import heapq
@@ -229,3 +229,134 @@ class SnakeAI(BaseAgent):
     def _heuristic(self, pos1: Tuple[int, int], pos2: Tuple[int, int]) -> int:
         """A*算法的启发式函数（曼哈顿距离）"""
         return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+
+class BasicSnakeAI(BaseAgent):
+    """基础贪吃蛇AI - 只考虑直接路径到食物，不考虑安全性"""
+    
+    def __init__(self, name="BasicSnakeAI", player_id=2):
+        super().__init__(name, player_id)
+    
+    def get_action(self, observation, env):
+        """获取动作 - 简单的直接寻路算法"""
+        game_state = self._parse_game_state(env)
+        
+        my_head = game_state['my_head']
+        my_snake = game_state['my_snake']
+        food_positions = game_state['food_positions']
+        board_size = game_state['board_size']
+        
+        # 如果没有食物，随机移动
+        if not food_positions:
+            return self._get_random_safe_action(my_head, my_snake, board_size)
+        
+        # 找到最近的食物
+        nearest_food = self._find_nearest_food(my_head, food_positions)
+        
+        # 尝试直接移动到食物
+        action = self._move_towards_food(my_head, nearest_food, my_snake, board_size)
+        
+        # 如果无法直接移动，随机选择安全动作
+        if action is None:
+            action = self._get_random_safe_action(my_head, my_snake, board_size)
+        
+        return action
+    
+    def _parse_game_state(self, env):
+        """解析游戏状态"""
+        state = env.game.get_state()
+        board = state['board']
+        board_size = board.shape[0]
+        
+        # 找到我的蛇
+        my_snake = []
+        my_head = None
+        for r in range(board_size):
+            for c in range(board_size):
+                if board[r, c] == self.player_id:  # 我的头部
+                    my_head = (r, c)
+                elif board[r, c] == self.player_id + 1:  # 我的身体
+                    my_snake.append((r, c))
+        
+        # 找到食物
+        food_positions = []
+        for r in range(board_size):
+            for c in range(board_size):
+                if board[r, c] == 5:  # 食物
+                    food_positions.append((r, c))
+        
+        return {
+            'my_head': my_head,
+            'my_snake': my_snake,
+            'food_positions': food_positions,
+            'board_size': board_size
+        }
+    
+    def _find_nearest_food(self, head, food_positions):
+        """找到最近的食物"""
+        if not food_positions:
+            return None
+        
+        nearest_food = min(food_positions, key=lambda food: abs(food[0] - head[0]) + abs(food[1] - head[1]))
+        return nearest_food
+    
+    def _move_towards_food(self, head, food, snake, board_size):
+        """直接移动到食物"""
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # 上、下、左、右
+        
+        # 计算到食物的方向
+        dr = food[0] - head[0]
+        dc = food[1] - head[1]
+        
+        # 优先选择主要方向
+        if abs(dr) > abs(dc):
+            # 垂直方向优先
+            if dr > 0:  # 向下
+                preferred_dirs = [(1, 0), (0, 1), (0, -1), (-1, 0)]
+            else:  # 向上
+                preferred_dirs = [(-1, 0), (0, 1), (0, -1), (1, 0)]
+        else:
+            # 水平方向优先
+            if dc > 0:  # 向右
+                preferred_dirs = [(0, 1), (1, 0), (-1, 0), (0, -1)]
+            else:  # 向左
+                preferred_dirs = [(0, -1), (1, 0), (-1, 0), (0, 1)]
+        
+        # 尝试每个方向
+        for direction in preferred_dirs:
+            new_head = (head[0] + direction[0], head[1] + direction[1])
+            
+            # 检查是否安全
+            if self._is_safe_move(new_head, snake, board_size):
+                return direction
+        
+        return None
+    
+    def _is_safe_move(self, new_head, snake, board_size):
+        """检查移动是否安全"""
+        r, c = new_head
+        
+        # 检查边界
+        if r < 0 or r >= board_size or c < 0 or c >= board_size:
+            return False
+        
+        # 检查是否撞到自己
+        if new_head in snake:
+            return False
+        
+        return True
+    
+    def _get_random_safe_action(self, head, snake, board_size):
+        """获取随机安全动作"""
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        safe_directions = []
+        
+        for direction in directions:
+            new_head = (head[0] + direction[0], head[1] + direction[1])
+            if self._is_safe_move(new_head, snake, board_size):
+                safe_directions.append(direction)
+        
+        if safe_directions:
+            return random.choice(safe_directions)
+        else:
+            # 没有安全方向，选择第一个方向（游戏会结束）
+            return directions[0]

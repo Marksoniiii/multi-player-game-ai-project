@@ -13,6 +13,7 @@ from games.snake import SnakeGame, SnakeEnv
 from games.pong import PongEnv
 from agents import RandomBot, MinimaxBot, MCTSBot, HumanAgent, SnakeAI
 from agents.ai_bots.greedy_pong_ai import GreedyPongAI
+from agents.ai_bots.snake_ai import SnakeAI, BasicSnakeAI
 import config
 
 # 颜色定义
@@ -137,7 +138,7 @@ class MultiGameGUI:
                 'text': 'AI先手',
                 'color': COLORS['LIGHT_GRAY']
             },
-            # AI选择
+            # AI选择（五子棋和贪吃蛇共用，但显示不同文本）
             'random_ai': {
                 'rect': pygame.Rect(start_x, start_y + vertical_gap * 6, button_width, button_height),
                 'text': 'Random AI',
@@ -155,17 +156,17 @@ class MultiGameGUI:
             },
             # 控制按钮
             'new_game': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 10, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 12, button_width, button_height),
                 'text': 'New Game',
                 'color': COLORS['GREEN']
             },
             'pause': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 11, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 13, button_width, button_height),
                 'text': 'Pause',
                 'color': COLORS['ORANGE']
             },
             'quit': {
-                'rect': pygame.Rect(start_x, start_y + vertical_gap * 12, button_width, button_height),
+                'rect': pygame.Rect(start_x, start_y + vertical_gap * 14, button_width, button_height),
                 'text': 'Quit',
                 'color': COLORS['RED']
             }
@@ -181,6 +182,20 @@ class MultiGameGUI:
             self.buttons[btn_name]['color'] = COLORS['LIGHT_GRAY']
         self.buttons[f'{game_type}_game']['color'] = COLORS['YELLOW']
         
+        # 重置AI按钮颜色
+        if game_type == "snake":
+            # 贪吃蛇模式：重置AI按钮颜色
+            for ai_btn in ['random_ai', 'minimax_ai', 'mcts_ai']:
+                self.buttons[ai_btn]['color'] = COLORS['LIGHT_GRAY']
+            # 设置默认选中的AI按钮为黄色
+            self.buttons['random_ai']['color'] = COLORS['YELLOW']
+        elif game_type == "gomoku":
+            # 五子棋模式：重置AI按钮颜色
+            for ai_btn in ['random_ai', 'minimax_ai', 'mcts_ai']:
+                self.buttons[ai_btn]['color'] = COLORS['LIGHT_GRAY']
+            # 设置默认选中的AI按钮为黄色
+            self.buttons['random_ai']['color'] = COLORS['YELLOW']
+        
         # 默认先手为玩家
         if not hasattr(self, 'gomoku_first'):
             self.gomoku_first = 'player'
@@ -191,12 +206,14 @@ class MultiGameGUI:
             self.update_interval = 1.0  # 五子棋不需要频繁更新
             # 创建人类玩家智能体
             self.human_agent = HumanAgent(name="Human Player", player_id=1)
+            # 设置五子棋默认AI
+            self.selected_ai = "RandomBot"
         elif game_type == "snake":
             self.env = SnakeEnv(board_size=20)
             self.cell_size = 25
             self.update_interval = 0.15
             self.selected_ai_name = "Basic AI"
-            self.ai_agent = SnakeAI(name=self.selected_ai_name, player_id=2)
+            self.ai_agent = BasicSnakeAI(name=self.selected_ai_name, player_id=2)
             self.human_direction = (0, 1)
             self.human_agent = HumanAgent(name="Human Player", player_id=1)
             self.current_agent = self.human_agent  # 关键：切换到snake时设为玩家
@@ -213,12 +230,14 @@ class MultiGameGUI:
     def _create_ai_agent(self):
         """创建AI智能体"""
         if self.current_game == "snake":
+            print(f"创建贪吃蛇AI: {self.selected_ai_name}")  # 调试信息
             ai_map = {
-                "Basic AI": SnakeAI,
                 "Smart AI": SnakeAI,
-                "Random AI": RandomBot
+                "Random AI": RandomBot,
+                "Basic AI": BasicSnakeAI # 新增Basic AI
             }
             ai_class = ai_map.get(self.selected_ai_name, SnakeAI)
+            print(f"选择的AI类: {ai_class.__name__}")  # 调试信息
             self.ai_agent = ai_class(name=self.selected_ai_name, player_id=2)
         elif self.current_game == "pong":
             self.ai_agent = GreedyPongAI(self.env.game, player_id=2)
@@ -322,15 +341,28 @@ class MultiGameGUI:
                     self.buttons['player_first']['color'] = COLORS['LIGHT_GRAY']
                     self.buttons['ai_first']['color'] = COLORS['YELLOW']
                     self.reset_game()
-                elif self.current_game == "snake" and button_name in ['basic_ai', 'smart_ai', 'random_ai']:
-                    self.selected_ai_name = button_info['text']
+                elif self.current_game == "snake" and button_name in ['random_ai', 'minimax_ai', 'mcts_ai']:
+                    print(f"贪吃蛇AI按钮被点击: {button_name}")  # 调试信息
+                    # 重置所有AI按钮颜色
+                    for ai_btn in ['random_ai', 'minimax_ai', 'mcts_ai']:
+                        self.buttons[ai_btn]['color'] = COLORS['LIGHT_GRAY']
+                    
+                    # 根据按钮名称设置对应的AI
+                    if button_name == 'random_ai':
+                        self.selected_ai_name = "Basic AI"
+                    elif button_name == 'minimax_ai':
+                        self.selected_ai_name = "Smart AI"
+                    elif button_name == 'mcts_ai':
+                        self.selected_ai_name = "Random AI"
+                    
+                    self.buttons[button_name]['color'] = COLORS['YELLOW']
+                    print(f"设置AI为: {self.selected_ai_name}")  # 调试信息
                     self._create_ai_agent()
                     self.reset_game()
-                elif button_name.endswith('_ai'):
-                    # 修复：先将所有AI按钮颜色重置为灰色
+                elif self.current_game == "gomoku" and button_name in ['random_ai', 'minimax_ai', 'mcts_ai']:
+                    # 重置所有五子棋AI按钮颜色
                     for ai_btn in ['random_ai', 'minimax_ai', 'mcts_ai']:
-                        if ai_btn in self.buttons:
-                            self.buttons[ai_btn]['color'] = COLORS['LIGHT_GRAY']
+                        self.buttons[ai_btn]['color'] = COLORS['LIGHT_GRAY']
                     # 设置当前选中的AI
                     if button_name == 'random_ai':
                         self.selected_ai = "RandomBot"
@@ -631,9 +663,29 @@ class MultiGameGUI:
         """绘制UI界面"""
         # 绘制按钮
         for button_name, button_info in self.buttons.items():
+            # 根据当前游戏类型决定是否显示某些按钮
+            if self.current_game == "gomoku":
+                # 五子棋：显示所有AI按钮（文本会自动调整）
+                pass
+            elif self.current_game == "snake":
+                # 贪吃蛇：显示所有AI按钮（文本会自动调整）
+                pass
+            
             pygame.draw.rect(self.screen, button_info['color'], button_info['rect'])
             pygame.draw.rect(self.screen, COLORS['BLACK'], button_info['rect'], 2)
-            text_surface = self.font_medium.render(button_info['text'], True, COLORS['BLACK'])
+            
+            # 动态设置按钮文本
+            display_text = button_info['text']
+            if self.current_game == "snake" and button_name in ['random_ai', 'minimax_ai', 'mcts_ai']:
+                # 贪吃蛇模式下，重新映射AI按钮文本
+                if button_name == 'random_ai':
+                    display_text = 'Basic AI'
+                elif button_name == 'minimax_ai':
+                    display_text = 'Smart AI'
+                elif button_name == 'mcts_ai':
+                    display_text = 'Random AI'
+            
+            text_surface = self.font_medium.render(display_text, True, COLORS['BLACK'])
             text_rect = text_surface.get_rect(center=button_info['rect'].center)
             self.screen.blit(text_surface, text_rect)
 
@@ -646,8 +698,13 @@ class MultiGameGUI:
             first_player_title = self.font_medium.render("First Player:", True, COLORS['BLACK'])
             self.screen.blit(first_player_title, (self.buttons['player_first']['rect'].x, self.buttons['player_first']['rect'].y - 28))
 
-        ai_title_text = self.font_medium.render("AI Selection:", True, COLORS['BLACK'])
-        self.screen.blit(ai_title_text, (self.buttons['random_ai']['rect'].x, self.buttons['random_ai']['rect'].y - 28))
+        # 根据游戏类型绘制不同的AI选择标题
+        if self.current_game == "gomoku":
+            ai_title_text = self.font_medium.render("AI Selection:", True, COLORS['BLACK'])
+            self.screen.blit(ai_title_text, (self.buttons['random_ai']['rect'].x, self.buttons['random_ai']['rect'].y - 28))
+        elif self.current_game == "snake":
+            ai_title_text = self.font_medium.render("AI Selection:", True, COLORS['BLACK'])
+            self.screen.blit(ai_title_text, (self.buttons['random_ai']['rect'].x, self.buttons['random_ai']['rect'].y - 28))
 
         # 绘制操作说明，整体下移，避免与底部按钮重叠
         if self.current_game == "gomoku":

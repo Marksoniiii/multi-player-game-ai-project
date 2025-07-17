@@ -34,8 +34,8 @@ class MCTSNode:
     def select_child(self, exploration_constant=1.414):
         """使用PUCT (Polynomial Upper Confidence Trees) 公式选择子节点"""
         # PUCT = Q(s,a) + U(s,a)
-        # Q(s,a) = wins / visits
-        # U(s,a) = c_puct * P(s,a) * sqrt(sum_visits) / (1 + visits)
+        #Q(s,a): child.wins / child.visits，代表该行动的平均胜率（利用）。
+        #U(s,a): 探索项，鼓励探索不常访问或先验概率高的节点。
         best_value = -float('inf')
         best_child = None
         for child in self.children:
