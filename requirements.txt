@@ -1,10 +1,34 @@
+# 核心依赖
 numpy>=1.21.0
 pygame>=2.0.0
-gym>=0.21.0
+gymnasium>=0.29.0
+
+# 图形界面和可视化
 matplotlib>=3.5.0
-pytest>=6.0.0
-tqdm>=4.60.0 
-tk>=0.1.0
-python-chess>=1.999
-stockfish>=3.28.0
+
+# AWS服务集成
+boto3>=1.29.0
+
+# HTTP请求
 requests>=2.25.0
+
+# 测试框架
+pytest>=6.0.0
+
+# 可选依赖（用于开发和高级功能）
+# tkinter - 通常随Python安装，无需单独安装
+# typing - Python内置模块，无需安装
+# json, time, random, os, sys, math, heapq - Python内置模块，无需安装
+
+# 开发工具（可选）
+# black>=22.0.0          # 代码格式化
+# flake8>=4.0.0          # 代码风格检查
+# mypy>=0.950            # 类型检查
+
+# 性能分析（可选）
+# memory-profiler>=0.60  # 内存使用分析
+# line-profiler>=3.5.0   # 行级性能分析
+
+# 文档生成（可选）
+# sphinx>=4.0.0          # 文档生成
+# sphinx-rtd-theme>=1.0  # ReadTheDocs主题

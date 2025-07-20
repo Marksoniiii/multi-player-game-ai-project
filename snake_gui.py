@@ -15,7 +15,7 @@ COLORS = {
 }
 
 class SnakeGUI:
-    """贪吃蛇图形界面 - 最终修复版"""
+    """贪吃蛇图形界面 """
     
     def __init__(self):
         pygame.init()

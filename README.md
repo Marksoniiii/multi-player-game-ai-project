@@ -1,276 +1,306 @@
-# 多人游戏AI框架
+# 多人游戏AI对战框架
 
-一个基于OpenAI Gym风格的多人游戏AI对战框架，支持五子棋和贪吃蛇游戏，提供图形界面和命令行两种模式。
+一个基于OpenAI Gym风格的多人游戏AI对战框架，支持五子棋、贪吃蛇、乒乓球、吃豆人和成语猜多多等多种游戏，提供图形界面和命令行两种模式，集成多种AI算法。
 
+## 🎮 项目特色
 
-### 1. conda 虚拟环境  (推荐)
-在conda提供的命令行界面里键入命令:
+- **多游戏支持**: 五子棋、贪吃蛇、乒乓球、吃豆人、成语猜多多
+- **丰富AI算法**: Minimax、MCTS、强化学习、行为树、LLM等
+- **双界面模式**: 图形界面(GUI)和命令行界面
+- **模块化设计**: 易于扩展新游戏和AI算法
+- **完整测试**: 全面的功能测试和性能验证
 
+## 📋 目录
+
+- [快速开始](#-快速开始)
+- [支持的游戏](#-支持的游戏)
+- [AI算法](#-ai算法)
+- [项目结构](#-项目结构)
+- [使用指南](#-使用指南)
+- [开发指南](#-开发指南)
+- [故障排除](#-故障排除)
+
+## 🚀 快速开始
+
+### 环境要求
+
+- Python 3.8+
+- 推荐使用conda或venv创建虚拟环境
+
+### 安装步骤
+
+#### 1. 创建虚拟环境 (推荐)
 ```bash
-conda create --name MultiPlayerGame python=3.12  # 创建虚拟环境, 推荐python版本为3.12
-
-# 激活虚拟环境
+# 使用conda
+conda create --name MultiPlayerGame python=3.12
 conda activate MultiPlayerGame
-# 升级pip
-python -m pip install --upgrade pip
+
+# 或使用venv
+python -m venv MultiPlayerGame
+source MultiPlayerGame/bin/activate  # Linux/macOS
+# MultiPlayerGame\Scripts\activate  # Windows
 ```
 
-### 2. 项目clone
+#### 2. 克隆项目
 ```bash
-# clone 项目 (推荐使用Git, 当然你也可以直接download下来)
 git clone https://github.com/ying-wen/multi-player-game-ai-project
-# 进入项目目录
 cd multi-player-game-ai-project
 ```
 
-### 4. python 依赖安装
-
+#### 3. 安装依赖
 ```bash
-# 安装项目依赖
 pip install -r requirements.txt
 ```
 
-
-#### Linux
+#### 4. 验证安装
 ```bash
-# 安装图形界面支持
-# Ubuntu/Debian:
-sudo apt install python3-tk #如果使用虚拟环境, tk 也可以使用 pip install tk 安装在python虚拟环境下, 这里是给系统的python解释器安装 pip 包
-
-# 如果使用ssh连接远程服务器，启用X11转发可以在本地显示图形界面
-ssh -X username@hostname
+python -c "import pygame, numpy; print('✅ 依赖安装成功')"
 ```
 
-## 🚀 快速启动
+### 启动游戏
 
-### 验证安装
 ```bash
-# 检查Python版本
-python --version
-
-# 检查pip版本
-pip --version
-
-# 检查依赖安装
-python -c "import pygame, numpy; print('Dependencies OK')"
-```
-
-### 启动项目
-```bash
-# 最简单的启动方式
 python start_games.py
 ```
 
-然后根据菜单选择：
-- **选择1**: 多游戏GUI (五子棋+贪吃蛇)
-- **选择2**: 贪吃蛇专用GUI (推荐贪吃蛇玩家)
-- **选择3**: 五子棋命令行版本
-- **选择4**: 贪吃蛇命令行版本
-- **选择5**: 运行测试
-- **选择6**: 退出
-
+选择游戏模式：
+- **1**: 多游戏GUI (五子棋+贪吃蛇)
+- **2**: 贪吃蛇专用GUI
+- **3**: 乒乓球 Pong
+- **4**: 吃豆人游戏
+- **5**: 成语猜多多
+- **6**: 退出
 
 ## 🎮 支持的游戏
 
 ### 1. 五子棋 (Gomoku)
 - **规则**: 15×15棋盘，连成5子获胜
-- **操作**: 图形界面点击落子，命令行输入坐标
+- **操作**: 鼠标点击落子
 - **AI支持**: 随机AI、Minimax算法、MCTS算法
+- **特色**: 支持Alpha-Beta剪枝、置换表优化
 
 ### 2. 贪吃蛇 (Snake)
 - **规则**: 双人贪吃蛇对战，吃食物长大，避免碰撞
 - **操作**: 方向键或WASD控制移动
-- **AI支持**: 基础贪吃蛇AI、智能寻路AI
+- **AI支持**: 基础AI、智能寻路AI(A*算法)
+- **特色**: 实时碰撞检测、安全空间计算
 
-## 🎯 图形界面说明
+### 3. 乒乓球 (Pong)
+- **规则**: 经典乒乓球游戏，双人对战或人机对战
+- **操作**: W/S键(玩家1)、方向键(玩家2)
+- **AI支持**: 贪婪AI算法
+- **特色**: 像素风格UI、物理引擎
 
-### 1. 多游戏GUI (`gui_game.py`)
-**特点**: 支持五子棋和贪吃蛇切换，全功能界面
-- 🖱️ **五子棋**: 鼠标点击落子
-- ⌨️ **贪吃蛇**: 方向键/WASD控制
-- 🎮 **游戏切换**: 点击按钮切换游戏类型
-- 🤖 **AI选择**: 随机AI、MinimaxAI、MCTS AI
-- ⏸️ **暂停功能**: 随时暂停/继续游戏
+### 4. 吃豆人 (Pacman)
+- **规则**: 吃豆人与幽灵对战，收集豆子或躲避
+- **操作**: WASD控制吃豆人，方向键控制幽灵
+- **AI支持**: 基础AI、高级AI(路径规划)
+- **特色**: 迷宫系统、道具系统
 
-### 2. 贪吃蛇专用GUI (`snake_gui.py`)
-**特点**: 专为贪吃蛇优化，更流畅的体验
-- 🐍 **专用界面**: 针对贪吃蛇优化的UI
-- 🎨 **视觉效果**: 更好的蛇身和食物显示
-- 🤖 **专用AI**: 基础AI、智能AI(A*算法)、随机AI
-- 📊 **实时信息**: 蛇长度、存活状态实时显示
+### 5. 成语猜多多 (Idiom Guessing)
+- **规则**: 基于LLM的智能成语猜谜游戏
+- **操作**: 键盘输入答案
+- **AI支持**: LLM智能出题系统
+- **特色**: 支持多种大语言模型、智能提示
 
-## 🎮 游戏操作指南
-
-### 五子棋操作
-- **目标**: 连成5子获胜
-- **操作**: 鼠标点击棋盘交叉点落子
-- **显示**: 黑子是你，白子是AI
-- **标记**: 红圈标记最后一步
-
-### 贪吃蛇操作
-- **目标**: 吃食物长大，避免碰撞
-- **操作**: 
-  - 方向键 ↑↓←→ 控制移动
-  - 或者 WASD 键控制移动
-- **显示**: 
-  - 蓝色蛇是你 (头部有眼睛)
-  - 红色蛇是AI (头部有眼睛)
-  - 绿色圆形是食物
-- **获胜**: 对手撞墙/撞蛇身，或比较最终长度
-
-## 🧠 AI算法说明
+## 🧠 AI算法
 
 ### 通用AI
-- **RandomBot**: 完全随机动作，适合练习
+- **RandomBot**: 完全随机动作，适合基准测试
 - **HumanAgent**: 人类玩家接口
 
 ### 五子棋AI
-- **MinimaxBot**: 经典博弈树搜索，中等难度
-- **MCTSBot**: 蒙特卡洛树搜索，高难度
+- **MinimaxBot**: 经典博弈树搜索算法
+  - Alpha-Beta剪枝优化
+  - 迭代深化搜索
+  - 置换表缓存
+  - 启发式评估函数
+- **MCTSBot**: 蒙特卡洛树搜索算法
+  - PUCT选择策略
+  - 启发式模拟
+  - 动态时间控制
 
 ### 贪吃蛇AI
-- **SnakeAI**: 基础AI，寻找最近食物
-- **SmartSnakeAI**: 智能AI，使用A*寻路算法
+- **SnakeAI**: 智能寻路算法
+  - A*路径规划
+  - 安全空间计算
+  - 碰撞避免
+- **BasicSnakeAI**: 基础贪心算法
 
-## 💻 命令行模式
+### 其他游戏AI
+- **GreedyPongAI**: 乒乓球贪婪AI
+- **PacmanAI**: 吃豆人路径规划AI
+- **LLMIdiomBot**: 基于大语言模型的智能出题
 
-### 直接启动命令
-```bash
-# 五子棋人机对战
-python main.py --game gomoku --player1 human --player2 minimax
+### 高级AI
+- **BehaviorTreeBot**: 行为树AI
+- **RLBot**: 强化学习AI (Q-learning)
+- **AdvancedPacmanAI**: 高级吃豆人AI
 
-# 贪吃蛇人机对战
-python main.py --game snake --player1 human --player2 snake_ai
-
-# AI对战观看
-python main.py --game gomoku --player1 mcts --player2 minimax
-```
-
-### 可用智能体
-- `human`: 人类玩家
-- `random`: 随机AI
-- `minimax`: Minimax算法AI
-- `mcts`: MCTS算法AI
-- `snake_ai`: 贪吃蛇基础AI
-- `smart_snake_ai`: 贪吃蛇智能AI
-
-## 📦 依赖说明
-
-### 核心依赖
-```txt
-pygame>=2.1.0       # 图形界面和游戏引擎
-numpy>=1.19.0       # 数值计算和数组操作
-typing-extensions   # 类型提示支持
-```
-
-### 可选依赖
-```bash
-# 开发和测试
-pytest              # 单元测试框架
-black               # 代码格式化
-flake8              # 代码风格检查
-
-# 性能分析
-cProfile            # Python内置性能分析器
-memory_profiler     # 内存使用分析
-```
-
-## 🧪 测试验证
-
-### 运行完整测试
-```bash
-python test_project.py
-```
-
-**测试结果**: 所有测试通过 (7/7)
-- ✅ 模块导入测试
-- ✅ 五子棋游戏逻辑测试
-- ✅ 五子棋环境测试
-- ✅ AI智能体测试
-- ✅ 游戏对战测试
-- ✅ 智能体评估测试
-- ✅ 自定义智能体测试
-
-### 单元测试
-```bash
-# 运行特定测试
-python -m pytest tests/
-
-# 运行覆盖率测试
-python -m pytest --cov=games --cov=agents tests/
-```
-
-## 🛠️ 项目结构
+## 📁 项目结构
 
 ```
 multi-player-game-ai-project/
-├── gui_game.py           # 多游戏图形界面
-├── snake_gui.py          # 贪吃蛇专用GUI
-├── start_games.py        # 启动脚本
-
-├── config.py             # 配置文件
-├── requirements.txt      # 依赖列表
-├── .gitignore           # Git忽略文件
-├── games/                # 游戏模块
-│   ├── __init__.py
-│   ├── base_game.py     # 游戏基类
-│   ├── base_env.py      # 环境基类
-│   ├── gomoku/          # 五子棋
-│   │   ├── __init__.py
-│   │   ├── gomoku_game.py
-│   │   └── gomoku_env.py
-│   └── snake/           # 贪吃蛇
-│       ├── __init__.py
-│       ├── snake_game.py
-│       └── snake_env.py
-├── agents/              # AI智能体
-│   ├── __init__.py
-│   ├── base_agent.py    # 智能体基类
-│   ├── human/           # 人类智能体
-│   │   ├── __init__.py
-│   │   ├── human_agent.py
-│   │   └── gui_human_agent.py
-│   └── ai_bots/         # AI机器人
-│       ├── __init__.py
-│       ├── random_bot.py
-│       ├── minimax_bot.py
-│       ├── mcts_bot.py
-│       ├── rl_bot.py
-│       ├── behavior_tree_bot.py
-│       └── snake_ai.py
-├── utils/               # 工具模块
-│   ├── __init__.py
-│   └── game_utils.py
-├── examples/            # 示例代码
-│   ├── basic_usage.py
-│   └── custom_agent.py
-└── tests/               # 测试文件
-    └── __init__.py
+├── start_games.py              # 游戏启动脚本
+├── gui_game.py                 # 多游戏图形界面
+├── snake_gui.py                # 贪吃蛇专用GUI
+├── pacman_gui.py               # 吃豆人GUI
+├── idiom_guessing_gui.py       # 成语猜多多GUI
+├── config.py                   # 配置文件
+├── requirements.txt            # 依赖列表
+│
+├── games/                      # 游戏模块
+│   ├── base_game.py           # 游戏基类
+│   ├── base_env.py            # 环境基类
+│   ├── gomoku/                # 五子棋
+│   ├── snake/                 # 贪吃蛇
+│   ├── pong/                  # 乒乓球
+│   ├── pacman/                # 吃豆人
+│   └── idiom_guessing/        # 成语猜多多
+│
+├── agents/                     # AI智能体
+│   ├── base_agent.py          # 智能体基类
+│   ├── human/                 # 人类智能体
+│   └── ai_bots/               # AI机器人
+│       ├── random_bot.py      # 随机AI
+│       ├── minimax_bot.py     # Minimax算法
+│       ├── mcts_bot.py        # MCTS算法
+│       ├── snake_ai.py        # 贪吃蛇AI
+│       ├── pacman_ai.py       # 吃豆人AI
+│       ├── llm_idiom_bot.py   # LLM智能体
+│       └── ...                # 其他AI
+│
+├── utils/                      # 工具模块
+│   ├── bedrock_client.py      # AWS Bedrock客户端
+│   ├── llm_manager.py         # LLM管理器
+│   └── game_utils.py          # 游戏工具
+│
+├── examples/                   # 示例代码
+│   ├── basic_usage.py         # 基础使用示例
+│   ├── custom_agent.py        # 自定义智能体示例
+│   └── advanced_ai_examples.py # 高级AI示例
+│
+└── amazon-bedrock-voice-conversation/  # AWS Bedrock集成
+    ├── app.py                 # 语音对话应用
+    ├── api_request_schema.py  # API请求模式
+    └── fine_tunning_data.py   # 微调数据
 ```
 
-## 🎯 使用建议
+## 🎯 使用指南
 
-### 新手推荐
-1. **开始**: 运行 `python start_games.py`
-2. **五子棋**: 选择1，然后选择随机AI练习
-3. **贪吃蛇**: 选择2，体验专用界面
+### 图形界面操作
 
-### 进阶玩家
-1. **挑战高难度**: 选择MCTS AI对战
-2. **观察AI**: 使用命令行模式观看AI对战
-3. **自定义**: 修改AI参数或添加新算法
+#### 多游戏GUI
+- **游戏切换**: 点击"Switch Game"按钮
+- **AI选择**: 下拉菜单选择不同AI
+- **暂停/继续**: 点击"Pause/Resume"按钮
+- **重新开始**: 点击"New Game"按钮
 
-### 开发者
-1. **测试**: 直接运行各游戏进行测试
-2. **扩展**: 参考现有代码添加新游戏或AI
-3. **调试**: 使用命令行模式便于调试
+#### 贪吃蛇专用GUI
+- **控制**: 方向键或WASD
+- **AI对战**: 选择不同AI难度
+- **实时信息**: 显示蛇长度和存活状态
+
+#### 吃豆人GUI
+- **模式选择**: 人机对战或双人对战
+- **角色选择**: 吃豆人或幽灵
+- **控制**: WASD(吃豆人)、方向键(幽灵)
+
+#### 成语猜多多GUI
+- **模式选择**: 单人挑战或双人对战
+- **LLM配置**: 设置API密钥和模型
+- **答题**: 键盘输入成语答案
+
+### 命令行模式
+
+```bash
+# 五子棋人机对战
+python -c "
+from games.gomoku.gomoku_env import GomokuEnv
+from agents.ai_bots.minimax_bot import MinimaxBot
+env = GomokuEnv()
+agent = MinimaxBot()
+# 开始游戏...
+"
+
+# 贪吃蛇AI对战
+python -c "
+from games.snake.snake_env import SnakeEnv
+from agents.ai_bots.snake_ai import SnakeAI
+env = SnakeEnv()
+agent1 = SnakeAI(player_id=1)
+agent2 = SnakeAI(player_id=2)
+# 开始对战...
+"
+```
+
+## 🔧 开发指南
+
+### 添加新游戏
+
+1. 在`games/`目录下创建新游戏文件夹
+2. 继承`BaseGame`和`BaseEnv`基类
+3. 实现必要的方法：
+   ```python
+   class NewGame(BaseGame):
+       def reset(self) -> Dict[str, Any]:
+           # 重置游戏状态
+           pass
+       
+       def step(self, action) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any]]:
+           # 执行动作
+           pass
+       
+       def get_valid_actions(self) -> List[Any]:
+           # 获取有效动作
+           pass
+       
+       def is_terminal(self) -> bool:
+           # 检查游戏是否结束
+           pass
+   ```
+
+### 添加新AI
+
+1. 在`agents/ai_bots/`目录下创建新AI文件
+2. 继承`BaseAgent`基类
+3. 实现`get_action`方法：
+   ```python
+   class NewAI(BaseAgent):
+       def get_action(self, observation, env):
+           # 实现AI决策逻辑
+           return action
+   ```
+
+### 配置参数
+
+编辑`config.py`文件调整参数：
+
+```python
+# 游戏参数
+GAME_CONFIGS = {
+    'new_game': {
+        'board_size': 10,
+        'timeout': 30,
+        'max_moves': 100,
+    }
+}
+
+# AI参数
+AI_CONFIGS = {
+    'new_ai': {
+        'max_depth': 4,
+        'timeout': 5,
+    }
+}
+```
 
 ## 🐛 故障排除
 
 ### 环境问题
 
 **Q: Python版本不兼容？**
-A: 确保使用Python 3.7+，推荐3.8-3.11版本
+A: 确保使用Python 3.8+，推荐3.10-3.12版本
 
 **Q: pip安装失败？**
 A: 
@@ -280,22 +310,19 @@ python -m pip install --upgrade pip
 
 # 使用国内镜像
 pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
-
-# 使用conda
-conda install pygame numpy
 ```
 
-**Q: 虚拟环境问题？**
+**Q: pygame安装失败？**
 A:
 ```bash
-# 删除旧环境
-rm -rf game_ai_env
+# Windows
+pip install pygame --pre
 
-# 重新创建
-python -m venv game_ai_env
-source game_ai_env/bin/activate  # Linux/macOS
-# 或 game_ai_env\Scripts\activate  # Windows
-pip install -r requirements.txt
+# Linux
+sudo apt-get install python3-pygame
+
+# macOS
+brew install pygame
 ```
 
 ### 图形界面问题
@@ -312,30 +339,26 @@ A:
 # 启用X11转发
 ssh -X username@hostname
 
-# 或者使用VNC/远程桌面
+# 或使用VNC/远程桌面
 ```
-
-**Q: 中文显示乱码？**
-A: 项目已使用英文界面，避免了字体问题
 
 ### 游戏问题
 
-**Q: 贪吃蛇移动太快/太慢？**
-A: 修改配置文件中的 `update_interval` 参数
-
 **Q: AI思考时间太长？**
 A: 调整AI参数：
-- Minimax: 减少 `max_depth`
-- MCTS: 减少 `simulation_count`
+```python
+# 在config.py中修改
+AI_CONFIGS = {
+    'minimax': {'max_depth': 3},  # 减少搜索深度
+    'mcts': {'timeout': 3},       # 减少时间限制
+}
+```
 
 **Q: 导入错误？**
 A:
 ```bash
 # 确保在项目根目录
 cd multi-player-game-ai-project
-
-# 检查Python路径
-python -c "import sys; print(sys.path)"
 
 # 设置PYTHONPATH
 export PYTHONPATH=$PYTHONPATH:$(pwd)
@@ -355,153 +378,51 @@ A:
 - 定期清理游戏历史记录
 - 使用更轻量的AI算法
 
-## 🔧 高级配置
-
-### 自定义配置
-编辑 `config.py` 文件可以调整：
-```python
-# 游戏参数
-BOARD_SIZE = 15          # 棋盘大小
-WIN_LENGTH = 5           # 获胜条件
-SNAKE_SPEED = 0.3        # 贪吃蛇速度
-
-# AI参数
-MINIMAX_DEPTH = 3        # Minimax搜索深度
-MCTS_SIMULATIONS = 500   # MCTS模拟次数
-
-# 界面参数
-WINDOW_WIDTH = 800       # 窗口宽度
-WINDOW_HEIGHT = 600      # 窗口高度
-```
-
-### 添加新游戏
-1. 在 `games/` 目录下创建新游戏文件夹
-2. 继承 `BaseGame` 和 `BaseEnv` 基类
-3. 实现必要的方法
-4. 在 `main.py` 中注册新游戏
-
-### 添加新AI
-1. 在 `agents/ai_bots/` 目录下创建新AI文件
-2. 继承 `BaseAgent` 基类
-3. 实现 `get_action` 方法
-4. 在 `agents/__init__.py` 中导入
-
 ## 🎊 项目亮点
 
 ### 完成的功能
-- ✅ **双游戏支持**: 五子棋和贪吃蛇
-- ✅ **图形界面**: 两种GUI选择
-- ✅ **多种AI**: 6种不同算法的AI
-- ✅ **人机对战**: 流畅的实时对战
-- ✅ **命令行模式**: 便于开发和调试
-- ✅ **完整测试**: 所有功能经过验证
+- ✅ **多游戏支持**: 5种不同游戏类型
+- ✅ **丰富AI算法**: 10+种不同算法的AI
+- ✅ **双界面模式**: GUI和命令行
+- ✅ **实时对战**: 流畅的人机对战体验
+- ✅ **模块化设计**: 易于扩展和维护
+- ✅ **完整测试**: 全面的功能验证
 - ✅ **用户友好**: 简单的启动和操作
 
 ### 技术特色
-- 🏗️ **模块化设计**: 易于扩展新游戏和AI
-- 🎯 **Gym风格**: 标准化的环境接口
+- 🏗️ **模块化架构**: 清晰的代码结构
+- 🎯 **Gym风格接口**: 标准化的环境接口
 - 🧪 **测试驱动**: 完整的测试覆盖
 - 📚 **文档完善**: 详细的使用说明
-
-## 📋 作业要求
-
-### 基本要求 
-1. **修复项目错误** 
-   - [x] 修复导入错误
-   - [x] 修复语法错误
-   - [x] 确保所有测试通过
-
-2. **完善AI Bot** 
-   - [x] 检查MinimaxBot的完整逻辑
-   - [x] 检查完善MCTSBot的蒙特卡洛树搜索
-   - [x] 检查完善贪吃蛇专用AI
-
-3. **测试和验证** 
-   - [x] 所有测试用例通过
-   - [x] AI对战功能正常
-   - [x] 人机对战功能正常
-   - [x] 图形界面正常
-
-### 扩展要求
-1. **实现至少一个新游戏** 
-   - [x] 至少支持双人对战模式
-   - [x] 支持图形界面
-
-2. **实现新AI Bot** 
-
-### 额外功能
-- [x] **图形界面**: 完整的pygame图形界面
-- [x] **多游戏支持**: 在同一界面切换不同游戏
-- [x] **实时对战**: 流畅的人机对战体验
-- [x] **暂停功能**: 游戏过程中可暂停/继续
-- [x] **启动脚本**: 用户友好的启动方式
+- 🤖 **AI多样性**: 从基础到高级的多种算法
+- 🎮 **游戏丰富**: 从传统到现代的多种游戏
 
 ## 🤝 贡献
 
 欢迎提交Issue和Pull Request来改进这个项目！
 
-### Github + git 的开发指南(建议预先学习git)
-1. 在github上 Fork 项目
-2. git clone到本地
-3. 在本地创建特性分支 (`git checkout -b feature/AmazingFeature`)
-4. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-5. 推送到分支 (`git push origin feature/AmazingFeature`)
-6. 打开Pull Request
+### 开发流程
+1. Fork项目
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 打开Pull Request
+
+### 代码规范
+- 使用Python 3.8+语法
+- 遵循PEP 8代码风格
+- 添加适当的类型提示
+- 编写单元测试
 
 ## 📄 许可证
 
 MIT License
 
-## 🐞 常见Bug与修复建议
+## 🙏 致谢
 
-- **导入错误/路径问题**：
-  - 确保所有import语句为绝对导入，包结构完整，`__init__.py`文件齐全。
-  - 如遇`ModuleNotFoundError`，请检查是否在项目根目录运行，或设置`PYTHONPATH`。
-- **五子棋胜负判断/平局**：
-  - 检查`get_winner`逻辑，确保棋盘下满时无胜者为平局。
-- **贪吃蛇碰撞与边界**：
-  - 检查蛇头与自身、对方、墙体的碰撞逻辑，确保双方同时死亡时为平局。
-- **AI算法不完善**：
-  - Minimax建议实现alpha-beta剪枝，MCTS建议实现UCB1选择与回传，SnakeAI建议实现A*寻路。
-- **图形界面问题**：
-  - 如pygame窗口无法显示，优先检查依赖和系统图形环境。
-- **性能与内存**：
-  - 长时间运行后如有卡顿，建议减少AI搜索深度或模拟次数。
+感谢所有为这个项目做出贡献的开发者和用户！
 
-## 🤖 AI算法完善建议
+---
 
-- **MinimaxBot**：
-  - 实现alpha-beta剪枝，提升搜索效率。
-  - 增加启发式评估函数（如活三、活四等）。
-  - 支持动态深度和超时机制。
-- **MCTSBot**：
-  - 实现UCB1选择、节点扩展、模拟和回传机制。
-  - 增加模拟次数参数，提升决策质量。
-- **SnakeAI**：
-  - 实现A*寻路算法，优先吃食物并避开危险。
-  - 增加对手预测和安全性评估。
-
-## 🧪 测试与验证建议
-
-- **边界测试**：
-  - 检查满棋盘、蛇撞墙、无可行动作等极端情况。
-- **性能测试**：
-  - 大量AI对战，观察内存和速度。
-- **功能测试**：
-  - 人机、AI对战、图形界面均需全流程测试。
-
-## 🚀 扩展开发建议
-
-- **新游戏开发**：
-  - 参考`games/`目录结构，继承`BaseGame`和`BaseEnv`。
-  - 推荐实现推箱子、乒乓球、吃豆人等。
-- **新AI开发**：
-  - 参考`agents/ai_bots/`，继承`BaseAgent`。
-  - 可实现贪心、规则、搜索、强化学习等AI。
-
-## 🤝 贡献与分支管理
-
-- 建议采用`feature/bug-fixes`、`feature/ai-enhancement`等分支协作开发。
-- 每次修复或新功能完成后及时提交并合并。
-- 欢迎提交PR和Issue，完善项目。
+**注意**: 这是一个教学项目，包含一些故意设置的bug和不完善的功能，需要学生修复和改进。请参考项目中的TODO文档了解具体任务。
 
